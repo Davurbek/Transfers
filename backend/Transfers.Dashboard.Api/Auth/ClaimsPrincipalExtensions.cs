@@ -1,6 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using Transfers.Dashboard.Api.Authorization;
+using Transfers.Dashboard.Business.Auth;
 
 namespace Transfers.Dashboard.Api.Auth;
 

@@ -112,10 +112,66 @@ npm run dev
 ```
 .
 ├── backend/
-│   └── Transfers.Dashboard.Api/      # .NET 10 Web API
-├── frontend/                         # Vue 3 + Vite + TS
+│   ├── Transfers.Dashboard.sln
+│   ├── Transfers.Dashboard.Domain/        # Entities, enums, shared models (no deps)
+│   ├── Transfers.Dashboard.DataAccess/    # DAL: DbContext, repositories, UnitOfWork, seeding
+│   ├── Transfers.Dashboard.Business/      # BLL: services, DTOs, auth/token, messaging, mapping
+│   └── Transfers.Dashboard.Api/           # Controllers, auth middleware, Program.cs
+├── frontend/                              # Vue 3 + Vite + TS
 ├── docs/
 │   ├── architecture.md
 │   └── database-schema.md
 └── README.md
+```
+
+## Layered architecture
+
+The backend follows a clean, one-directional dependency flow:
+
+```
+Controller (API)  ->  Service (BLL)  ->  Repository (DAL)  ->  DbContext / DB
+   thin HTTP          business logic      data access only      EF Core (SQLite)
+```
+
+- **Controllers** only translate HTTP <-> service calls (no EF, no business rules).
+- **Services** hold all business logic (auth, permission resolution, unpause flow,
+  audit) and map entities to DTOs.
+- **Repositories** are the only layer that touches `DbContext`; an `IUnitOfWork`
+  commits changes.
+- **Domain** has zero dependencies and is shared by every layer.
+
+Each layer exposes an `AddDataAccess(...)` / `AddBusiness(...)` DI extension so
+`Program.cs` wiring stays small.
+
+## Key API endpoints
+
+| Method | Route | Permission | Notes |
+|---|---|---|---|
+| `POST` | `/api/auth/login` | — | Sets refresh cookie |
+| `POST` | `/api/auth/refresh` | — | Rotates refresh token |
+| `POST` | `/api/auth/logout` | — | Revokes refresh token |
+| `GET` | `/api/auth/me` | (auth) | Current user + permissions |
+| `GET` | `/api/transactions` | `tx:read` | **Filter + pagination** (see below) |
+| `GET` | `/api/transactions/{id}` | `tx:read` | Lifecycle / credit / partner history |
+| `POST` | `/api/transactions/{id}/unpause` | `tx:unpause` | Publishes command, writes audit, `202` |
+| `GET` | `/api/audit` | `audit:read` | **Filter + pagination** audit log |
+
+**Transactions filter query params:** `search`, `status`, `userId`, `isPaused`,
+`fromDate`, `toDate`, `page` (default 1), `pageSize` (default 20, max 100).
+
+**Audit filter query params:** `targetTransactionId`, `actionType`, `username`,
+`fromDate`, `toDate`, `page` (default 1), `pageSize` (default 50, max 200).
+
+Both return a `PagedResult<T>`:
+
+```json
+{
+  "items": [ /* ... */ ],
+  "page": 1,
+  "pageSize": 20,
+  "totalCount": 137,
+  "totalPages": 7,
+  "hasPrevious": false,
+  "hasNext": true
+}
 ```
