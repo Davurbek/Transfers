@@ -3,37 +3,33 @@ using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.RateLimiting;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Transfers.Dashboard.Api.Auth;
 using Transfers.Dashboard.Api.Authorization;
-using Transfers.Dashboard.Api.Data;
 using Transfers.Dashboard.Api.Messaging;
-using Transfers.Dashboard.Api.Services;
+using Transfers.Dashboard.Business;
+using Transfers.Dashboard.Business.Auth;
+using Transfers.Dashboard.Business.Messaging;
+using Transfers.Dashboard.DataAccess;
+using Transfers.Dashboard.DataAccess.Context;
+using Transfers.Dashboard.DataAccess.Seeding;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // ---------------- Configuration ----------------
-builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
 var jwt = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
+var connectionString = builder.Configuration.GetConnectionString("Dashboard") ?? "Data Source=dashboard.db";
 
 const string CorsPolicy = "dashboard-ui";
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
                      ?? ["http://localhost:5173"];
 
-// ---------------- Persistence (isolated Dashboard DB) ----------------
-builder.Services.AddDbContext<DashboardDbContext>(opt =>
-    opt.UseSqlite(builder.Configuration.GetConnectionString("Dashboard")
-                  ?? "Data Source=dashboard.db"));
+// ---------------- Layered registrations ----------------
+builder.Services.AddDataAccess(connectionString);        // DAL: DbContext + repositories + UoW
+builder.Services.AddBusiness(builder.Configuration);     // BLL: services + token/permission + projector
 
-// ---------------- Auth services ----------------
-builder.Services.AddScoped<PermissionResolver>();
-builder.Services.AddScoped<TokenService>();
-builder.Services.AddScoped<AuditService>();
-
-// ---------------- Messaging / data sync ----------------
-builder.Services.AddScoped<IEventProjector, EventProjector>();
+// ---------------- Messaging (broker abstraction) ----------------
 builder.Services.AddSingleton<SimulatedBroker>();
 builder.Services.AddSingleton<ICommandPublisher>(sp => sp.GetRequiredService<SimulatedBroker>());
 builder.Services.AddHostedService(sp => sp.GetRequiredService<SimulatedBroker>());
@@ -42,8 +38,7 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<SimulatedBroker>()
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
-        // Keep claim types exactly as issued ("sub", "unique_name", "perm").
-        options.MapInboundClaims = false;
+        options.MapInboundClaims = false; // keep "sub", "unique_name", "perm" as-is
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
@@ -68,7 +63,6 @@ builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
-    // Strict limit for authentication endpoints (brute-force protection).
     options.AddPolicy("auth", httpContext =>
         RateLimitPartition.GetFixedWindowLimiter(
             partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "anon",
@@ -79,7 +73,6 @@ builder.Services.AddRateLimiter(options =>
                 QueueLimit = 0,
             }));
 
-    // Limit for sensitive mutations (unpause, etc.).
     options.AddPolicy("mutations", httpContext =>
         RateLimitPartition.GetFixedWindowLimiter(
             partitionKey: httpContext.User.GetUserId().ToString(),
@@ -108,7 +101,8 @@ builder.Services.AddSwaggerGen(c =>
     {
         Title = "Transfers Operational Dashboard API",
         Version = "v1",
-        Description = "Read-mostly operational dashboard for the cross-border Transfers service.",
+        Description = "Read-mostly operational dashboard for the cross-border Transfers service. "
+                      + "Layered: Controller -> Service (BLL) -> Repository (DAL) -> DB.",
     });
 
     var scheme = new OpenApiSecurityScheme

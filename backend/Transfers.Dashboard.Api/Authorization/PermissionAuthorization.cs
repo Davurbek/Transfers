@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Options;
-using Transfers.Dashboard.Api.Auth;
+using Transfers.Dashboard.Business.Auth;
 
 namespace Transfers.Dashboard.Api.Authorization;
 
@@ -37,10 +37,7 @@ public sealed class PermissionHandler : AuthorizationHandler<PermissionRequireme
     }
 }
 
-/// <summary>
-/// Builds permission policies on demand so we don't have to register one policy
-/// per permission string up front.
-/// </summary>
+/// <summary>Builds permission policies on demand (one per permission string).</summary>
 public sealed class PermissionPolicyProvider(IOptions<AuthorizationOptions> options) : IAuthorizationPolicyProvider
 {
     private readonly DefaultAuthorizationPolicyProvider _fallback = new(options);

@@ -1,19 +1,19 @@
 using System.Threading.Channels;
-using Transfers.Dashboard.Api.Domain.Transactions;
+using Transfers.Dashboard.Business.Messaging;
+using Transfers.Dashboard.Domain.Entities.Transactions;
 
 namespace Transfers.Dashboard.Api.Messaging;
 
 /// <summary>
 /// In-process stand-in for Kafka/RabbitMQ used by the PoC. It:
-///   1. accepts commands from the API (ICommandPublisher),
+///   1. accepts commands from the BLL (ICommandPublisher),
 ///   2. mimics the Main App re-running its state machine, and
-///   3. emits the resulting lifecycle event back, which is projected into the
-///      Dashboard DB — demonstrating the full round-trip in real time.
+///   3. emits the resulting lifecycle event back, projected into the Dashboard DB.
 ///
 /// In production this whole class is replaced by real broker producer/consumer
-/// clients; the API and UI are unchanged.
+/// clients; the controllers, services and repositories are unchanged.
 /// </summary>
-public class SimulatedBroker(IServiceProvider services, ILogger<SimulatedBroker> logger)
+public sealed class SimulatedBroker(IServiceProvider services, ILogger<SimulatedBroker> logger)
     : BackgroundService, ICommandPublisher
 {
     private readonly Channel<TransferCommand> _commands =
@@ -43,15 +43,11 @@ public class SimulatedBroker(IServiceProvider services, ILogger<SimulatedBroker>
 
     private async Task HandleCommandAsync(TransferCommand command, CancellationToken ct)
     {
-        // Simulate Main App processing latency.
         await Task.Delay(TimeSpan.FromMilliseconds(1500), ct);
 
         switch (command)
         {
             case UnpauseTransactionCommand unpause:
-            {
-                // Main App re-runs the state machine for the paused transaction:
-                // Paused -> RegistrationFailedRetry -> RegistrationSucceeded.
                 await EmitAsync(new TransactionStatusChanged
                 {
                     TransactionId = unpause.TransactionId,
@@ -72,7 +68,7 @@ public class SimulatedBroker(IServiceProvider services, ILogger<SimulatedBroker>
                     IsPaused = false,
                 }, ct);
                 break;
-            }
+
             default:
                 logger.LogWarning("No simulated handler for {Type}", command.GetType().Name);
                 break;
