@@ -1,43 +1,29 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using Transfers.Dashboard.Api.Authorization;
-using Transfers.Dashboard.Api.Data;
-using Transfers.Dashboard.Api.Dtos;
+using Transfers.Dashboard.Business.Dtos;
+using Transfers.Dashboard.Business.Services;
+using Transfers.Dashboard.Domain.Authorization;
+using Transfers.Dashboard.Domain.Common;
 
 namespace Transfers.Dashboard.Api.Controllers;
 
 [ApiController]
 [Route("api/audit")]
 [Authorize]
-public class AuditController(DashboardDbContext db) : ControllerBase
+public class AuditController(IAuditService auditService) : ControllerBase
 {
-    /// <summary>Read the immutable audit log (requires audit:read).</summary>
+    /// <summary>
+    /// Filtered + paginated immutable audit log (requires audit:read).
+    /// Query params: targetTransactionId, actionType, username, fromDate, toDate, page, pageSize.
+    /// </summary>
     [HttpGet]
     [RequirePermission(Permissions.AuditRead)]
+    [ProducesResponseType(typeof(PagedResult<AuditLogDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<PagedResult<AuditLogDto>>> List(
-        [FromQuery] string? transactionId,
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 50,
-        CancellationToken ct = default)
+        [FromQuery] AuditFilter filter, CancellationToken ct)
     {
-        page = Math.Max(1, page);
-        pageSize = Math.Clamp(pageSize, 1, 200);
-
-        var query = db.AuditLogs.AsNoTracking().AsQueryable();
-        if (!string.IsNullOrWhiteSpace(transactionId))
-            query = query.Where(a => a.TargetTransactionId == transactionId);
-
-        var total = await query.CountAsync(ct);
-        var items = await query
-            .OrderByDescending(a => a.Timestamp)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .Select(a => new AuditLogDto(
-                a.Id, a.Username, a.ActionType, a.TargetTransactionId,
-                a.Timestamp, a.IpAddress, a.Metadata))
-            .ToListAsync(ct);
-
-        return Ok(new PagedResult<AuditLogDto>(items, page, pageSize, total));
+        var result = await auditService.SearchAsync(filter, ct);
+        return Ok(result);
     }
 }

@@ -112,10 +112,82 @@ npm run dev
 ```
 .
 ├── backend/
-│   └── Transfers.Dashboard.Api/      # .NET 10 Web API
-├── frontend/                         # Vue 3 + Vite + TS
+│   ├── Transfers.Dashboard.sln
+│   ├── Transfers.Dashboard.Domain/        # Entities, enums, shared models (no deps)
+│   ├── Transfers.Dashboard.DataAccess/    # DAL: DbContext, repositories, UnitOfWork, seeding
+│   ├── Transfers.Dashboard.Business/      # BLL: services, DTOs, auth/token, messaging, mapping
+│   └── Transfers.Dashboard.Api/           # Controllers, auth middleware, Program.cs
+├── frontend/                              # Vue 3 + Vite + TS (layered, see below)
+│   └── src/
+│       ├── domain/         # models, paging, permission constants (no deps)
+│       ├── infrastructure/ # httpClient (axios) — the only thing that does HTTP
+│       ├── repositories/   # DAL: one class per resource (+ interfaces)
+│       ├── services/       # BLL: business logic, query normalization (+ interfaces)
+│       ├── di/             # composition root — wires repositories into services
+│       ├── stores/         # Pinia session state (uses services)
+│       ├── composables/    # presentation logic + state (useTransactions, useAudit…)
+│       ├── components/      # reusable UI
+│       └── views/           # pages
 ├── docs/
 │   ├── architecture.md
 │   └── database-schema.md
 └── README.md
+```
+
+## Layered architecture
+
+Both tiers follow the same clean, one-directional dependency flow.
+
+**Backend (.NET):**
+
+```
+Controller (API)  ->  Service (BLL)  ->  Repository (DAL)  ->  DbContext / DB
+   thin HTTP          business logic      data access only      EF Core (SQLite)
+```
+
+**Frontend (Vue) — mirrors the backend:**
+
+```
+View / Component  ->  Composable / Store  ->  Service (BLL)  ->  Repository (DAL)  ->  httpClient (infra) -> API
+  presentation         presentation state     business logic     data access only        axios
+```
+
+- **Controllers / Views** only translate user/HTTP intent into calls (no data access, no rules).
+- **Services** hold business logic and depend on repository **interfaces** (constructor injection).
+- **Repositories** are the only layer that touches the data source (`DbContext` / `axios`).
+- **Domain** has zero dependencies and is shared by every layer.
+- A composition root wires it together: `AddDataAccess(...)` / `AddBusiness(...)` on the
+  backend, and `src/di/container.ts` on the frontend.
+
+## Key API endpoints
+
+| Method | Route | Permission | Notes |
+|---|---|---|---|
+| `POST` | `/api/auth/login` | — | Sets refresh cookie |
+| `POST` | `/api/auth/refresh` | — | Rotates refresh token |
+| `POST` | `/api/auth/logout` | — | Revokes refresh token |
+| `GET` | `/api/auth/me` | (auth) | Current user + permissions |
+| `GET` | `/api/transactions` | `tx:read` | **Filter + pagination** (see below) |
+| `GET` | `/api/transactions/{id}` | `tx:read` | Lifecycle / credit / partner history |
+| `POST` | `/api/transactions/{id}/unpause` | `tx:unpause` | Publishes command, writes audit, `202` |
+| `GET` | `/api/audit` | `audit:read` | **Filter + pagination** audit log |
+
+**Transactions filter query params:** `search`, `status`, `userId`, `isPaused`,
+`fromDate`, `toDate`, `page` (default 1), `pageSize` (default 20, max 100).
+
+**Audit filter query params:** `targetTransactionId`, `actionType`, `username`,
+`fromDate`, `toDate`, `page` (default 1), `pageSize` (default 50, max 200).
+
+Both return a `PagedResult<T>`:
+
+```json
+{
+  "items": [ /* ... */ ],
+  "page": 1,
+  "pageSize": 20,
+  "totalCount": 137,
+  "totalPages": 7,
+  "hasPrevious": false,
+  "hasNext": true
+}
 ```

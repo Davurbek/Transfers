@@ -89,3 +89,44 @@ UI code changes are required.
   `target_transaction_id`, `timestamp`, `ip_address`.
 - **Rate limiting:** Fixed/sliding-window limiters on `auth` and `mutation`
   endpoints.
+
+
+## 7. Backend layering (Controller → Service → Repository → DB)
+
+The backend is split into four projects with a strict one-way dependency graph:
+
+```
+Transfers.Dashboard.Api          (Controllers, auth middleware, Program.cs)
+        │  depends on
+        ▼
+Transfers.Dashboard.Business     (Services / BLL, DTOs, token & permission
+        │                         services, messaging, entity→DTO mapping)
+        ▼
+Transfers.Dashboard.DataAccess   (DbContext, repositories, UnitOfWork, seeding)
+        │
+        ▼
+Transfers.Dashboard.Domain       (Entities, enums, shared models — no deps)
+```
+
+Responsibilities:
+
+- **Api (Controller):** maps HTTP to service calls only. No EF Core, no business
+  rules. Owns cross-cutting HTTP concerns (JWT bearer, permission policies,
+  rate limiting, the refresh cookie, Swagger).
+- **Business (BLL):** all business logic — login/refresh/logout, effective
+  permission resolution (`direct ∪ role`), the unpause flow (audit + command
+  publish), audit queries — plus entity→DTO mapping. Talks to repositories
+  through interfaces.
+- **DataAccess (DAL):** the only layer that touches `DbContext`. Repositories
+  expose filtered/paginated queries; `IUnitOfWork` commits the transaction.
+- **Domain:** POCO entities, enums, `PagedResult<T>`, `PagedQuery`, and the
+  filter objects. No framework dependencies.
+
+### Filtering + pagination
+
+Repository search methods accept a strongly-typed filter (`TransactionFilter`,
+`AuditFilter`) derived from `PagedQuery`, which self-clamps `Page`/`PageSize`.
+They return `PagedResult<TEntity>`; services project to `PagedResult<TDto>` via
+`PagedResult.Map`. This keeps paging metadata (`totalCount`, `totalPages`,
+`hasNext`, `hasPrevious`) consistent across both the transactions and audit-log
+endpoints.

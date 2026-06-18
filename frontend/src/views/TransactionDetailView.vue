@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue'
 import { AxiosError } from 'axios'
-import { fetchTransaction, unpauseTransaction } from '@/api/transactions'
-import { Permission, type TransactionDetail } from '@/types'
+import { transactionService } from '@/di/container'
+import { Permission } from '@/domain/permissions'
+import type { TransactionDetail } from '@/domain/models'
 import StatusBadge from '@/components/StatusBadge.vue'
 import PermissionGate from '@/components/PermissionGate.vue'
 
@@ -19,7 +20,7 @@ async function load() {
   loading.value = true
   error.value = null
   try {
-    detail.value = await fetchTransaction(props.id)
+    detail.value = await transactionService.getDetail(props.id)
   } catch {
     error.value = 'Failed to load transaction'
   } finally {
@@ -32,7 +33,7 @@ async function onUnpause() {
   acting.value = true
   actionMsg.value = null
   try {
-    const res = await unpauseTransaction(detail.value.summary.transactionId)
+    const res = await transactionService.unpause(detail.value.summary.transactionId)
     actionMsg.value = `${res.message} (command ${res.commandId.slice(0, 8)}…)`
     // The new state arrives asynchronously via the consumed event — poll briefly.
     startPolling()
