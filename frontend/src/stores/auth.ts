@@ -1,8 +1,14 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import { api, configureAuthHandlers, setAccessToken } from '@/api/client'
-import type { AuthResponse, UserInfo } from '@/types'
+import { configureAuthHandlers, setAccessToken } from '@/infrastructure/httpClient'
+import { authService } from '@/di/container'
+import type { AuthResponse, UserInfo } from '@/domain/models'
 
+/**
+ * Presentation-layer session state. Holds the access token + user in memory and
+ * delegates all I/O to the auth service (BLL). Also wires the HTTP client's
+ * silent-refresh handler to this store.
+ */
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<UserInfo | null>(null)
   const accessToken = ref<string | null>(null)
@@ -28,16 +34,15 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function login(username: string, password: string): Promise<void> {
-    const { data } = await api.post<AuthResponse>('/auth/login', { username, password })
-    applyAuth(data)
+    applyAuth(await authService.login(username, password))
   }
 
   /** Try to silently re-establish a session using the refresh cookie. */
   async function refresh(): Promise<string | null> {
     try {
-      const { data } = await api.post<AuthResponse>('/auth/refresh')
-      applyAuth(data)
-      return data.accessToken
+      const res = await authService.refresh()
+      applyAuth(res)
+      return res.accessToken
     } catch {
       clear()
       return null
@@ -46,7 +51,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function logout(): Promise<void> {
     try {
-      await api.post('/auth/logout')
+      await authService.logout()
     } finally {
       clear()
     }
@@ -59,11 +64,8 @@ export const useAuthStore = defineStore('auth', () => {
     initialized.value = true
   }
 
-  // Wire the axios interceptor to this store.
-  configureAuthHandlers({
-    refresh,
-    onUnauthorized: clear,
-  })
+  // Wire the HTTP client interceptor to this store.
+  configureAuthHandlers({ refresh, onUnauthorized: clear })
 
   return {
     user,

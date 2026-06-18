@@ -1,18 +1,21 @@
 import axios, {
-  AxiosError,
+  type AxiosError,
   type AxiosInstance,
   type InternalAxiosRequestConfig,
 } from 'axios'
 
 /**
- * Axios instance for the dashboard API.
+ * Infrastructure layer — the single HTTP client used by the repository layer.
+ * Analogous to the backend's DbContext: the only place that talks to the
+ * "outside world" (the API). Repositories depend on this; services and views
+ * never use axios directly.
  *
- * - Attaches the in-memory access token to every request.
- * - On a 401, transparently tries POST /api/auth/refresh (using the HttpOnly
- *   refresh cookie) once, then replays the original request.
+ * Responsibilities:
+ * - attach the in-memory access token to every request,
+ * - transparently refresh once on a 401 and replay the original request.
  *
  * The access token lives only in memory (never localStorage) to limit XSS
- * exposure; the long-lived refresh token is an HttpOnly cookie the JS can't read.
+ * exposure; the long-lived refresh token is an HttpOnly cookie JS cannot read.
  */
 
 let accessToken: string | null = null
@@ -26,6 +29,7 @@ export function setAccessToken(token: string | null): void {
   accessToken = token
 }
 
+/** Wires the auth flow (called by the auth store, which owns the session state). */
 export function configureAuthHandlers(handlers: {
   refresh: RefreshHandler
   onUnauthorized: UnauthorizedHandler
@@ -34,12 +38,12 @@ export function configureAuthHandlers(handlers: {
   onUnauthorized = handlers.onUnauthorized
 }
 
-export const api: AxiosInstance = axios.create({
+export const http: AxiosInstance = axios.create({
   baseURL: '/api',
   withCredentials: true, // send the refresh cookie
 })
 
-api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+http.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   if (accessToken) {
     config.headers.set('Authorization', `Bearer ${accessToken}`)
   }
@@ -53,7 +57,7 @@ interface RetriableConfig extends InternalAxiosRequestConfig {
 // Single in-flight refresh shared across concurrent 401s.
 let refreshPromise: Promise<string | null> | null = null
 
-api.interceptors.response.use(
+http.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     const original = error.config as RetriableConfig | undefined
@@ -69,7 +73,7 @@ api.interceptors.response.use(
 
         if (newToken) {
           original.headers.set('Authorization', `Bearer ${newToken}`)
-          return api(original)
+          return http(original)
         }
       } catch {
         refreshPromise = null

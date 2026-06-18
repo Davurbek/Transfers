@@ -1,56 +1,12 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
-import { fetchAuditLogs, type AuditLog } from '@/api/audit'
+import { onMounted } from 'vue'
+import { useAudit } from '@/composables/useAudit'
 import PaginationBar from '@/components/PaginationBar.vue'
 
-const items = ref<AuditLog[]>([])
-const total = ref(0)
-const loading = ref(false)
-const error = ref<string | null>(null)
-
-const filters = reactive({
-  targetTransactionId: '',
-  actionType: '',
-  username: '',
-  page: 1,
-  pageSize: 50,
-})
+const { items, total, loading, error, filters, load, applyFilters, setPage, setPageSize } =
+  useAudit()
 
 const actionTypes = ['tx:unpause', 'tx:cancel']
-
-async function load() {
-  loading.value = true
-  error.value = null
-  try {
-    const res = await fetchAuditLogs({
-      targetTransactionId: filters.targetTransactionId || undefined,
-      actionType: filters.actionType || undefined,
-      username: filters.username || undefined,
-      page: filters.page,
-      pageSize: filters.pageSize,
-    })
-    items.value = res.items
-    total.value = res.totalCount
-  } catch {
-    error.value = 'Failed to load audit log'
-  } finally {
-    loading.value = false
-  }
-}
-
-function applyFilters() {
-  filters.page = 1
-  load()
-}
-function setPage(p: number) {
-  filters.page = p
-  load()
-}
-function setPageSize(s: number) {
-  filters.pageSize = s
-  filters.page = 1
-  load()
-}
 
 function fmt(value: string) {
   return new Date(value).toLocaleString()
@@ -96,8 +52,8 @@ onMounted(load)
         </table>
 
         <PaginationBar
-          :page="filters.page"
-          :page-size="filters.pageSize"
+          :page="filters.page ?? 1"
+          :page-size="filters.pageSize ?? 50"
           :total-count="total"
           @update:page="setPage"
           @update:page-size="setPageSize"

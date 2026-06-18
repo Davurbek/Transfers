@@ -117,7 +117,17 @@ npm run dev
 │   ├── Transfers.Dashboard.DataAccess/    # DAL: DbContext, repositories, UnitOfWork, seeding
 │   ├── Transfers.Dashboard.Business/      # BLL: services, DTOs, auth/token, messaging, mapping
 │   └── Transfers.Dashboard.Api/           # Controllers, auth middleware, Program.cs
-├── frontend/                              # Vue 3 + Vite + TS
+├── frontend/                              # Vue 3 + Vite + TS (layered, see below)
+│   └── src/
+│       ├── domain/         # models, paging, permission constants (no deps)
+│       ├── infrastructure/ # httpClient (axios) — the only thing that does HTTP
+│       ├── repositories/   # DAL: one class per resource (+ interfaces)
+│       ├── services/       # BLL: business logic, query normalization (+ interfaces)
+│       ├── di/             # composition root — wires repositories into services
+│       ├── stores/         # Pinia session state (uses services)
+│       ├── composables/    # presentation logic + state (useTransactions, useAudit…)
+│       ├── components/      # reusable UI
+│       └── views/           # pages
 ├── docs/
 │   ├── architecture.md
 │   └── database-schema.md
@@ -126,22 +136,28 @@ npm run dev
 
 ## Layered architecture
 
-The backend follows a clean, one-directional dependency flow:
+Both tiers follow the same clean, one-directional dependency flow.
+
+**Backend (.NET):**
 
 ```
 Controller (API)  ->  Service (BLL)  ->  Repository (DAL)  ->  DbContext / DB
    thin HTTP          business logic      data access only      EF Core (SQLite)
 ```
 
-- **Controllers** only translate HTTP <-> service calls (no EF, no business rules).
-- **Services** hold all business logic (auth, permission resolution, unpause flow,
-  audit) and map entities to DTOs.
-- **Repositories** are the only layer that touches `DbContext`; an `IUnitOfWork`
-  commits changes.
-- **Domain** has zero dependencies and is shared by every layer.
+**Frontend (Vue) — mirrors the backend:**
 
-Each layer exposes an `AddDataAccess(...)` / `AddBusiness(...)` DI extension so
-`Program.cs` wiring stays small.
+```
+View / Component  ->  Composable / Store  ->  Service (BLL)  ->  Repository (DAL)  ->  httpClient (infra) -> API
+  presentation         presentation state     business logic     data access only        axios
+```
+
+- **Controllers / Views** only translate user/HTTP intent into calls (no data access, no rules).
+- **Services** hold business logic and depend on repository **interfaces** (constructor injection).
+- **Repositories** are the only layer that touches the data source (`DbContext` / `axios`).
+- **Domain** has zero dependencies and is shared by every layer.
+- A composition root wires it together: `AddDataAccess(...)` / `AddBusiness(...)` on the
+  backend, and `src/di/container.ts` on the frontend.
 
 ## Key API endpoints
 

@@ -1,71 +1,20 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { fetchTransactions } from '@/api/transactions'
-import type { TransactionSummary } from '@/types'
+import { useTransactions } from '@/composables/useTransactions'
+import type { TransactionSummary } from '@/domain/models'
 import StatusBadge from '@/components/StatusBadge.vue'
 import PaginationBar from '@/components/PaginationBar.vue'
 
 const router = useRouter()
-const items = ref<TransactionSummary[]>([])
-const total = ref(0)
-const loading = ref(false)
-const error = ref<string | null>(null)
-
-const filters = reactive({
-  search: '',
-  status: '',
-  userId: '',
-  fromDate: '',
-  toDate: '',
-  page: 1,
-  pageSize: 20,
-})
+const { items, total, loading, error, filters, load, applyFilters, setPage, setPageSize } =
+  useTransactions()
 
 const statuses = [
   'ConfirmPending', 'ConfirmSucceeded', 'CreditPending', 'CreditSucceeded',
   'RegistrationPending', 'RegistrationFailedRetry', 'RegistrationSucceeded',
   'Paused', 'Cancelled',
 ]
-
-async function load() {
-  loading.value = true
-  error.value = null
-  try {
-    const res = await fetchTransactions({
-      search: filters.search || undefined,
-      status: filters.status || undefined,
-      userId: filters.userId || undefined,
-      fromDate: filters.fromDate ? new Date(filters.fromDate).toISOString() : undefined,
-      toDate: filters.toDate ? new Date(filters.toDate).toISOString() : undefined,
-      page: filters.page,
-      pageSize: filters.pageSize,
-    })
-    items.value = res.items
-    total.value = res.totalCount
-  } catch {
-    error.value = 'Failed to load transactions'
-  } finally {
-    loading.value = false
-  }
-}
-
-// Searching/filtering resets to the first page.
-function applyFilters() {
-  filters.page = 1
-  load()
-}
-
-function setPage(p: number) {
-  filters.page = p
-  load()
-}
-
-function setPageSize(s: number) {
-  filters.pageSize = s
-  filters.page = 1
-  load()
-}
 
 function openDetail(tx: TransactionSummary) {
   router.push({ name: 'transaction-detail', params: { id: tx.transactionId } })
@@ -130,8 +79,8 @@ onMounted(load)
         </table>
 
         <PaginationBar
-          :page="filters.page"
-          :page-size="filters.pageSize"
+          :page="filters.page ?? 1"
+          :page-size="filters.pageSize ?? 20"
           :total-count="total"
           @update:page="setPage"
           @update:page-size="setPageSize"

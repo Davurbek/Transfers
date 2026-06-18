@@ -1,3 +1,5 @@
+// Domain models shared across every layer (mirrors the backend Domain project).
+
 export interface UserInfo {
   id: string
   username: string
@@ -10,6 +12,11 @@ export interface AuthResponse {
   accessToken: string
   accessTokenExpiresAt: string
   user: UserInfo
+}
+
+export interface LoginCredentials {
+  username: string
+  password: string
 }
 
 export interface TransactionSummary {
@@ -56,14 +63,14 @@ export interface TransactionDetail {
   partnerRegistrations: PartnerRegistration[]
 }
 
-export interface PagedResult<T> {
-  items: T[]
-  page: number
-  pageSize: number
-  totalCount: number
-  totalPages?: number
-  hasPrevious?: boolean
-  hasNext?: boolean
+export interface AuditLog {
+  id: string
+  username: string
+  actionType: string
+  targetTransactionId: string | null
+  timestamp: string
+  ipAddress: string
+  metadata: string | null
 }
 
 export interface ActionAcceptedResponse {
@@ -71,11 +78,3 @@ export interface ActionAcceptedResponse {
   transactionId: string
   commandId: string
 }
-
-// Permission string constants (must mirror the backend catalogue).
-export const Permission = {
-  TxRead: 'tx:read',
-  TxUnpause: 'tx:unpause',
-  TxCancel: 'tx:cancel',
-  AuditRead: 'audit:read',
-} as const
