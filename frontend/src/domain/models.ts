@@ -57,7 +57,16 @@ export interface PartnerRegistration {
 }
 
 export interface TransactionDetail {
-  summary: TransactionSummary
+  transactionId: string
+  userId: string
+  recipientName: string
+  amount: number
+  currency: string
+  corridor: string
+  currentStatus: string
+  isPaused: boolean
+  createdAt: string
+  updatedAt: string
   statusHistory: StatusHistory[]
   creditAttempts: CreditAttempt[]
   partnerRegistrations: PartnerRegistration[]

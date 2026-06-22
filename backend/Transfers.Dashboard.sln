@@ -1,15 +1,15 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 17
-VisualStudioVersion = 17.0.31903.59
+# Visual Studio Version 18
+VisualStudioVersion = 18.2.11415.280 d18.0
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Transfers.Dashboard.Domain", "Transfers.Dashboard.Domain\Transfers.Dashboard.Domain.csproj", "{2306DC6E-3490-4622-82B3-C502B0C053AA}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Domain", "src\Domain\Domain.csproj", "{2306DC6E-3490-4622-82B3-C502B0C053AA}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Transfers.Dashboard.DataAccess", "Transfers.Dashboard.DataAccess\Transfers.Dashboard.DataAccess.csproj", "{A7CB12BA-F3C8-476D-AFF5-7B64DD53BB5C}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Infrastructure", "src\Infrastructure\Infrastructure.csproj", "{A7CB12BA-F3C8-476D-AFF5-7B64DD53BB5C}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Transfers.Dashboard.Business", "Transfers.Dashboard.Business\Transfers.Dashboard.Business.csproj", "{4811D0FC-B0A9-4595-BEC2-659307D46684}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Application", "src\Application\Application.csproj", "{4811D0FC-B0A9-4595-BEC2-659307D46684}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Transfers.Dashboard.Api", "Transfers.Dashboard.Api\Transfers.Dashboard.Api.csproj", "{9868E363-98D3-4746-9959-E816AA03EAA9}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Api", "src\Api\Api.csproj", "{9868E363-98D3-4746-9959-E816AA03EAA9}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -72,5 +72,8 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {DD4680AA-01A6-4A16-AD7B-7B014FA0653A}
 	EndGlobalSection
 EndGlobal

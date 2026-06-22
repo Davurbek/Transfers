@@ -1,0 +1,9 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Universal.Transfers.$(MSBuildProjectName)</RootNamespace>
+    <AssemblyName>Universal.Transfers.$(MSBuildProjectName)</AssemblyName>
+  </PropertyGroup>
+</Project>

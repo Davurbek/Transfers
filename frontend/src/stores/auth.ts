@@ -35,6 +35,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function login(username: string, password: string): Promise<void> {
     applyAuth(await authService.login(username, password))
+    initialized.value = true
   }
 
   /** Try to silently re-establish a session using the refresh cookie. */

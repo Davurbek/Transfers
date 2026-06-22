@@ -29,35 +29,70 @@ function changeSize(e: Event) {
 </script>
 
 <template>
-  <div class="row spread wrap pagination">
-    <span class="muted">
-      {{ from }}–{{ to }} / {{ totalCount }} ta
-    </span>
-    <div class="row">
-      <label class="muted size">
-        Sahifa hajmi
+  <div class="pagination">
+    <span class="pagination-info">{{ from }}–{{ to }} / {{ totalCount }}</span>
+    <div class="pagination-controls">
+      <label class="page-size">
+        <span>Per page</span>
         <select :value="pageSize" @change="changeSize">
           <option v-for="s in pageSizes" :key="s" :value="s">{{ s }}</option>
         </select>
       </label>
-      <button class="secondary" :disabled="page <= 1" @click="go(page - 1)">‹ Oldingi</button>
-      <span class="muted">{{ page }} / {{ totalPages }}</span>
-      <button class="secondary" :disabled="page >= totalPages" @click="go(page + 1)">Keyingi ›</button>
+      <div class="page-nav">
+        <button class="secondary page-btn" :disabled="page <= 1" @click="go(page - 1)">‹</button>
+        <span class="page-indicator">{{ page }} / {{ totalPages }}</span>
+        <button class="secondary page-btn" :disabled="page >= totalPages" @click="go(page + 1)">›</button>
+      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
 .pagination {
-  margin-top: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 20px;
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+  gap: 12px;
 }
-.size {
+.pagination-info {
+  font-size: 12px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.page-size {
   display: flex;
   align-items: center;
   gap: 6px;
   font-size: 12px;
+  color: var(--text-dim);
 }
-.size select {
+.page-size select {
   padding: 4px 6px;
+  font-size: 12px;
+}
+.page-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.page-btn {
+  padding: 6px 12px;
+  font-size: 16px;
+  line-height: 1;
+}
+.page-indicator {
+  font-size: 12px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+  min-width: 60px;
+  text-align: center;
 }
 </style>

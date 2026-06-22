@@ -4,18 +4,18 @@ import type { AuditLog } from '@/domain/models'
 import type { AuditQuery } from '@/domain/paging'
 
 /** Presentation logic for the audit-log view: reactive state + pagination. */
-export function useAudit() {
+export function useAudit(initial?: Partial<AuditQuery>) {
   const items = ref<AuditLog[]>([])
   const total = ref(0)
   const loading = ref(false)
   const error = ref<string | null>(null)
 
   const filters = reactive<AuditQuery>({
-    targetTransactionId: '',
-    actionType: '',
-    username: '',
-    page: 1,
-    pageSize: 50,
+    targetTransactionId: initial?.targetTransactionId ?? '',
+    actionType: initial?.actionType ?? '',
+    username: initial?.username ?? '',
+    page: initial?.page ?? 1,
+    pageSize: initial?.pageSize ?? 50,
   })
 
   async function load(): Promise<void> {

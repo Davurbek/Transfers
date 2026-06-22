@@ -38,8 +38,10 @@ export function configureAuthHandlers(handlers: {
   onUnauthorized = handlers.onUnauthorized
 }
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api'
+
 export const http: AxiosInstance = axios.create({
-  baseURL: '/api',
+  baseURL: API_BASE_URL,
   withCredentials: true, // send the refresh cookie
 })
 

@@ -33,9 +33,8 @@ async function onUnpause() {
   acting.value = true
   actionMsg.value = null
   try {
-    const res = await transactionService.unpause(detail.value.summary.transactionId)
-    actionMsg.value = `${res.message} (command ${res.commandId.slice(0, 8)}…)`
-    // The new state arrives asynchronously via the consumed event — poll briefly.
+    const res = await transactionService.unpause(detail.value.transactionId)
+    actionMsg.value = `Command sent (${res.commandId.slice(0, 8)}…)`
     startPolling()
   } catch (e) {
     const ax = e as AxiosError<{ message?: string }>
@@ -54,7 +53,7 @@ function startPolling() {
   pollTimer = window.setInterval(async () => {
     ticks += 1
     await load()
-    if (!detail.value?.summary.isPaused || ticks >= 8) {
+    if (!detail.value?.isPaused || ticks >= 8) {
       stopPolling()
     }
   }, 1500)
@@ -77,129 +76,248 @@ onUnmounted(stopPolling)
 
 <template>
   <div class="container">
-    <RouterLink to="/" class="muted">&larr; Back to transactions</RouterLink>
+    <RouterLink to="/" class="back-link">&larr; Back to transactions</RouterLink>
 
-    <p v-if="error" class="error">{{ error }}</p>
-    <p v-else-if="loading && !detail" class="muted">Loading…</p>
+    <div v-if="error" class="error-state">
+      <p class="error">{{ error }}</p>
+      <button class="secondary" @click="load">Retry</button>
+    </div>
+
+    <div v-else-if="loading && !detail" class="loading-state">
+      <div class="skeleton" style="width: 280px; height: 24px; margin-bottom: 20px" />
+      <div class="card"><div class="skeleton" style="width: 100%; height: 120px" /></div>
+    </div>
 
     <template v-else-if="detail">
-      <div class="row spread" style="margin: 12px 0 16px">
-        <h1 class="mono">{{ detail.summary.transactionId }}</h1>
-        <StatusBadge :status="detail.summary.currentStatus" />
-      </div>
-
-      <!-- Summary -->
-      <div class="card" style="margin-bottom: 16px">
-        <div class="grid">
-          <div><span class="muted">Recipient</span><div>{{ detail.summary.recipientName }}</div></div>
-          <div><span class="muted">Amount</span><div>{{ detail.summary.amount.toFixed(2) }} {{ detail.summary.currency }}</div></div>
-          <div><span class="muted">Corridor</span><div>{{ detail.summary.corridor }}</div></div>
-          <div><span class="muted">Sender</span><div class="mono">{{ detail.summary.userId }}</div></div>
-          <div><span class="muted">Created</span><div>{{ fmt(detail.summary.createdAt) }}</div></div>
-          <div><span class="muted">Updated</span><div>{{ fmt(detail.summary.updatedAt) }}</div></div>
+      <div class="detail-header">
+        <div class="detail-title">
+          <h1 class="mono">{{ detail.transactionId }}</h1>
+          <StatusBadge :status="detail.currentStatus" />
         </div>
-
-        <!-- Write action: permission-gated (UI scoping) -->
-        <div v-if="detail.summary.isPaused" class="action-bar">
+        <div class="detail-actions">
           <PermissionGate :permission="Permission.TxUnpause">
-            <button class="danger" :disabled="acting" @click="onUnpause">
-              {{ acting ? 'Sending command…' : 'Unpause transaction' }}
+            <button
+              v-if="detail.isPaused"
+              class="danger"
+              :disabled="acting"
+              @click="onUnpause"
+            >
+              {{ acting ? 'Unpausing…' : 'Unpause transaction' }}
             </button>
             <template #denied>
-              <span class="muted">This transaction is paused. You lack <code>tx:unpause</code>.</span>
+              <span v-if="detail.isPaused" class="muted">Paused — you lack unpause permission</span>
             </template>
           </PermissionGate>
         </div>
-        <p v-if="actionMsg" class="muted action-msg">{{ actionMsg }}</p>
+      </div>
+      <p v-if="actionMsg" class="action-msg">{{ actionMsg }}</p>
+
+      <!-- Summary -->
+      <div class="card info-card">
+        <div class="info-grid">
+          <div class="info-item">
+            <span class="info-label">Recipient</span>
+            <span class="info-value">{{ detail.recipientName }}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Amount</span>
+            <span class="info-value amount">{{ detail.amount.toFixed(2) }} {{ detail.currency }}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Corridor</span>
+            <span class="info-value">{{ detail.corridor }}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Sender ID</span>
+            <span class="info-value mono">{{ detail.userId }}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Created</span>
+            <span class="info-value">{{ fmt(detail.createdAt) }}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Updated</span>
+            <span class="info-value">{{ fmt(detail.updatedAt) }}</span>
+          </div>
+        </div>
       </div>
 
-      <!-- Lifecycle timeline -->
-      <div class="card" style="margin-bottom: 16px">
+      <!-- Timeline -->
+      <div class="card section-card">
         <h2>Lifecycle history</h2>
-        <ol class="timeline">
+        <div v-if="!detail.statusHistory.length" class="empty-section">
+          No status changes recorded.
+        </div>
+        <ol class="timeline" v-else>
           <li v-for="(h, i) in detail.statusHistory" :key="i">
-            <div class="dot" />
-            <div>
-              <div class="row" style="gap: 8px">
+            <div class="dot" :class="{ first: i === 0 }" />
+            <div class="timeline-content">
+              <div class="timeline-header">
                 <StatusBadge :status="h.toStatus" />
                 <span v-if="h.fromStatus" class="muted">from {{ h.fromStatus }}</span>
               </div>
-              <div class="muted" v-if="h.reason">{{ h.reason }}</div>
-              <div class="muted small">{{ fmt(h.occurredAt) }}</div>
+              <p v-if="h.reason" class="timeline-reason">{{ h.reason }}</p>
+              <span class="timeline-time">{{ fmt(h.occurredAt) }}</span>
             </div>
           </li>
         </ol>
       </div>
 
       <!-- Credit attempts -->
-      <div class="card" style="margin-bottom: 16px">
-        <h2>Credit attempts (Humo / Uzcard)</h2>
-        <table>
-          <thead>
-            <tr><th>#</th><th>Gateway</th><th>Result</th><th>Code</th><th>Response</th><th>When</th></tr>
-          </thead>
-          <tbody>
-            <tr v-for="c in detail.creditAttempts" :key="c.attemptNumber">
-              <td>{{ c.attemptNumber }}</td>
-              <td>{{ c.gateway }}</td>
-              <td><StatusBadge :status="c.status" /></td>
-              <td>{{ c.failureCode ?? '—' }}</td>
-              <td class="mono small">{{ c.gatewayResponse ?? '—' }}</td>
-              <td class="muted">{{ fmt(c.attemptedAt) }}</td>
-            </tr>
-            <tr v-if="!detail.creditAttempts.length"><td colspan="6" class="muted">No credit attempts.</td></tr>
-          </tbody>
-        </table>
+      <div class="card section-card">
+        <h2>Credit attempts</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>#</th><th>Gateway</th><th>Result</th><th>Code</th><th>Response</th><th>When</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="c in detail.creditAttempts" :key="c.attemptNumber">
+                <td>{{ c.attemptNumber }}</td>
+                <td>{{ c.gateway }}</td>
+                <td><StatusBadge :status="c.status" /></td>
+                <td>{{ c.failureCode ?? '—' }}</td>
+                <td class="mono small">{{ c.gatewayResponse ?? '—' }}</td>
+                <td class="muted">{{ fmt(c.attemptedAt) }}</td>
+              </tr>
+              <tr v-if="!detail.creditAttempts.length"><td colspan="6" class="empty-section">No credit attempts.</td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <!-- Partner registrations -->
-      <div class="card">
+      <div class="card section-card">
         <h2>Partner registrations</h2>
-        <table>
-          <thead>
-            <tr><th>Partner</th><th>Result</th><th>Reference</th><th>Reason</th><th>When</th></tr>
-          </thead>
-          <tbody>
-            <tr v-for="(p, i) in detail.partnerRegistrations" :key="i">
-              <td>{{ p.partnerName }}</td>
-              <td><StatusBadge :status="p.status" /></td>
-              <td class="mono">{{ p.referenceId ?? '—' }}</td>
-              <td>{{ p.failureReason ?? '—' }}</td>
-              <td class="muted">{{ fmt(p.registeredAt) }}</td>
-            </tr>
-            <tr v-if="!detail.partnerRegistrations.length"><td colspan="5" class="muted">No partner registrations.</td></tr>
-          </tbody>
-        </table>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Partner</th><th>Result</th><th>Reference</th><th>Reason</th><th>When</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="(p, i) in detail.partnerRegistrations" :key="i">
+                <td>{{ p.partnerName }}</td>
+                <td><StatusBadge :status="p.status" /></td>
+                <td class="mono">{{ p.referenceId ?? '—' }}</td>
+                <td>{{ p.failureReason ?? '—' }}</td>
+                <td class="muted">{{ fmt(p.registeredAt) }}</td>
+              </tr>
+              <tr v-if="!detail.partnerRegistrations.length"><td colspan="5" class="empty-section">No partner registrations.</td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </template>
   </div>
 </template>
 
 <style scoped>
-h1 {
+.back-link {
+  display: inline-block;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+.detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.detail-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.detail-title h1 {
   font-size: 22px;
   margin: 0;
 }
-h2 {
-  font-size: 15px;
-  margin: 0 0 12px;
-}
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 16px;
-}
-.action-bar {
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border);
+.detail-actions {
+  display: flex;
+  gap: 8px;
 }
 .action-msg {
-  margin-top: 10px;
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  background: var(--success-bg);
+  color: var(--success);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.info-card {
+  margin-bottom: 16px;
+}
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 20px;
+}
+.info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.info-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.info-value {
+  font-size: 14px;
+  font-weight: 500;
+}
+.amount {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--success);
+}
+
+.section-card {
+  margin-bottom: 16px;
+}
+.section-card h2 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 16px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.table-wrap {
+  overflow-x: auto;
 }
 .small {
   font-size: 12px;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
+
+.empty-section {
+  text-align: center;
+  color: var(--text-dim);
+  padding: 32px 16px;
+  font-size: 13px;
+}
+.error-state {
+  text-align: center;
+  padding: 40px 24px;
+}
+.error-state .error {
+  margin-bottom: 12px;
+}
+.loading-state {
+  padding: 20px 0;
+}
+
 .timeline {
   list-style: none;
   margin: 0;
@@ -207,20 +325,46 @@ h2 {
 }
 .timeline li {
   position: relative;
-  padding: 0 0 18px 22px;
+  padding: 0 0 24px 28px;
   border-left: 2px solid var(--border);
 }
 .timeline li:last-child {
   border-left-color: transparent;
+  padding-bottom: 0;
 }
 .dot {
   position: absolute;
   left: -7px;
-  top: 4px;
+  top: 2px;
   width: 12px;
   height: 12px;
   border-radius: 50%;
+  background: var(--surface-3);
+  border: 2px solid var(--border);
+}
+.dot.first {
   background: var(--primary);
-  border: 2px solid var(--surface);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px var(--primary-glow);
+}
+.timeline-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.timeline-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.timeline-reason {
+  font-size: 13px;
+  color: var(--text);
+  margin: 2px 0;
+}
+.timeline-time {
+  font-size: 11px;
+  color: var(--text-muted);
 }
 </style>

@@ -14,8 +14,16 @@ export default defineConfig({
     port: 5173,
     proxy: {
       // Proxy API calls to the .NET backend during development.
-      '/api': {
-        target: 'http://localhost:5080',
+      '/auth': {
+        target: 'http://localhost:5290',
+        changeOrigin: true,
+      },
+      '/transactions': {
+        target: 'http://localhost:5290',
+        changeOrigin: true,
+      },
+      '/audit': {
+        target: 'http://localhost:5290',
         changeOrigin: true,
       },
     },

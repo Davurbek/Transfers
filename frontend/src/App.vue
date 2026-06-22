@@ -11,7 +11,18 @@ const showHeader = computed(() => auth.isAuthenticated && !route.meta.public)
 
 <template>
   <AppHeader v-if="showHeader" />
-  <main>
-    <RouterView />
+  <main :class="{ 'has-sidebar': showHeader }">
+    <RouterView v-slot="{ Component }">
+      <transition name="fade" mode="out-in">
+        <component :is="Component" />
+      </transition>
+    </RouterView>
   </main>
 </template>
+
+<style scoped>
+.has-sidebar {
+  margin-left: var(--sidebar-width);
+  min-height: 100vh;
+}
+</style>

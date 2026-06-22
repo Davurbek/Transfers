@@ -29,54 +29,79 @@ onMounted(load)
 
 <template>
   <div class="container">
-    <div class="row spread" style="margin-bottom: 16px">
-      <h1>Transactions</h1>
-      <span class="muted">{{ total }} total</span>
+    <div class="page-header">
+      <div>
+        <h1>Transactions</h1>
+        <p class="muted" v-if="!loading">{{ total }} total transactions</p>
+      </div>
+      <div class="skeleton" v-if="loading" style="width: 120px; height: 16px" />
     </div>
 
-    <div class="card" style="margin-bottom: 16px">
+    <div class="card filter-card">
       <form class="filters" @submit.prevent="applyFilters">
-        <input v-model="filters.search" placeholder="Search id or recipient…" />
+        <input v-model="filters.search" placeholder="Search ID or recipient…" />
         <select v-model="filters.status">
           <option value="">All statuses</option>
           <option v-for="s in statuses" :key="s" :value="s">{{ s }}</option>
         </select>
-        <input v-model="filters.userId" placeholder="Sender id…" />
-        <label class="date">From <input v-model="filters.fromDate" type="datetime-local" /></label>
-        <label class="date">To <input v-model="filters.toDate" type="datetime-local" /></label>
+        <input v-model="filters.userId" placeholder="Sender ID…" />
+        <label class="date-label">
+          <span>From</span>
+          <input v-model="filters.fromDate" type="datetime-local" />
+        </label>
+        <label class="date-label">
+          <span>To</span>
+          <input v-model="filters.toDate" type="datetime-local" />
+        </label>
         <button type="submit">Filter</button>
       </form>
     </div>
 
-    <div class="card">
-      <p v-if="error" class="error">{{ error }}</p>
-      <p v-else-if="loading" class="muted">Loading…</p>
+    <div class="card table-card">
+      <div v-if="error" class="error-state">
+        <p class="error">{{ error }}</p>
+        <button class="secondary" @click="load">Retry</button>
+      </div>
+
+      <template v-else-if="loading">
+        <div class="skeleton-row" v-for="i in 5" :key="i">
+          <div class="skeleton" style="width: 20%; height: 14px" />
+          <div class="skeleton" style="width: 25%; height: 14px" />
+          <div class="skeleton" style="width: 12%; height: 14px" />
+          <div class="skeleton" style="width: 15%; height: 14px" />
+          <div class="skeleton" style="width: 14%; height: 14px" />
+          <div class="skeleton" style="width: 14%; height: 14px" />
+        </div>
+      </template>
+
       <template v-else>
-        <table>
-          <thead>
-            <tr>
-              <th>Transaction</th>
-              <th>Recipient</th>
-              <th>Amount</th>
-              <th>Corridor</th>
-              <th>Status</th>
-              <th>Created</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="tx in items" :key="tx.transactionId" @click="openDetail(tx)" style="cursor: pointer">
-              <td class="mono">{{ tx.transactionId }}</td>
-              <td>{{ tx.recipientName }}</td>
-              <td>{{ tx.amount.toFixed(2) }} {{ tx.currency }}</td>
-              <td>{{ tx.corridor }}</td>
-              <td><StatusBadge :status="tx.currentStatus" /></td>
-              <td class="muted">{{ fmt(tx.createdAt) }}</td>
-            </tr>
-            <tr v-if="!items.length">
-              <td colspan="6" class="muted">No transactions found.</td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Transaction</th>
+                <th>Recipient</th>
+                <th>Amount</th>
+                <th>Corridor</th>
+                <th>Status</th>
+                <th>Created</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="tx in items" :key="tx.transactionId" @click="openDetail(tx)" class="clickable-row">
+                <td class="mono">{{ tx.transactionId }}</td>
+                <td>{{ tx.recipientName }}</td>
+                <td class="amount">{{ tx.amount.toFixed(2) }} {{ tx.currency }}</td>
+                <td>{{ tx.corridor }}</td>
+                <td><StatusBadge :status="tx.currentStatus" /></td>
+                <td class="muted">{{ fmt(tx.createdAt) }}</td>
+              </tr>
+              <tr v-if="!items.length">
+                <td colspan="6" class="empty-state">No transactions found.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
 
         <PaginationBar
           :page="filters.page ?? 1"
@@ -91,29 +116,70 @@ onMounted(load)
 </template>
 
 <style scoped>
-h1 {
-  font-size: 22px;
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 20px;
+}
+.page-header h1 {
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0 0 4px;
+}
+.page-header p {
+  font-size: 13px;
   margin: 0;
 }
-.filters {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-  align-items: center;
+
+.filter-card {
+  margin-bottom: 16px;
+  padding: 16px 20px;
 }
-.filters input,
-.filters select {
-  flex: 0 0 auto;
-}
-.filters > input:first-child {
-  flex: 1;
-  min-width: 200px;
-}
-.date {
+.date-label {
   display: flex;
   align-items: center;
   gap: 6px;
   font-size: 12px;
   color: var(--text-dim);
+}
+.date-label input {
+  width: 180px;
+}
+
+.table-card {
+  padding: 0;
+  overflow: hidden;
+}
+.table-wrap {
+  overflow-x: auto;
+}
+.clickable-row {
+  cursor: pointer;
+}
+.amount {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.empty-state {
+  text-align: center;
+  color: var(--text-dim);
+  padding: 40px 16px !important;
+}
+.error-state {
+  padding: 40px 24px;
+  text-align: center;
+}
+.error-state .error {
+  margin-bottom: 12px;
+}
+.skeleton-row {
+  display: flex;
+  gap: 16px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.skeleton-row:last-child {
+  border-bottom: none;
 }
 </style>
