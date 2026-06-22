@@ -11,7 +11,8 @@ const { items, total, loading, error, filters, load, applyFilters, setPage, setP
   useTransactions()
 
 const statuses = [
-  'ConfirmPending', 'ConfirmSucceeded', 'CreditPending', 'CreditSucceeded',
+  'ConfirmPending', 'ConfirmExpired', 'ConfirmFailed', 'ConfirmSucceeded',
+  'CreditPending', 'CreditSucceeded', 'CreditFailedRetry', 'CreditFailed',
   'RegistrationPending', 'RegistrationFailedRetry', 'RegistrationSucceeded',
   'Paused', 'Cancelled',
 ]

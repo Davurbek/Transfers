@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Universal.Transfers.Domain.Common;
 using Universal.Transfers.Domain.Transactions.Entities;
+using Universal.Transfers.Domain.Transactions.Enums;
 using Universal.Transfers.Domain.Transactions.Interfaces;
 using Universal.Transfers.Infrastructure.Common.Persistence;
 
@@ -46,6 +47,9 @@ public sealed class TransactionRepository(AppDbContext db) : ITransactionReposit
     public Task<Transaction?> GetByTransactionIdAsync(string transactionId, CancellationToken ct = default) =>
         db.Transactions.AsNoTracking().FirstOrDefaultAsync(t => t.TransactionId == transactionId, ct);
 
+    public Task<Transaction?> GetByInternalRefAsync(string internalRef, CancellationToken ct = default) =>
+        db.Transactions.AsNoTracking().FirstOrDefaultAsync(t => t.InternalRef == internalRef, ct);
+
     public Task<Transaction?> GetDetailAsync(string transactionId, CancellationToken ct = default) =>
         db.Transactions.AsNoTracking()
             .Include(t => t.StatusHistory)
@@ -61,4 +65,18 @@ public sealed class TransactionRepository(AppDbContext db) : ITransactionReposit
 
     public Task<bool> StatusEventExistsAsync(string eventId, CancellationToken ct = default) =>
         db.TransactionStatusHistory.AnyAsync(h => h.EventId == eventId, ct);
+
+    public async Task UpdateCurrentStatusAsync(Guid id, TransactionStatus newStatus, bool? isPaused = null, CancellationToken ct = default)
+    {
+        var tx = await db.Transactions.FindAsync([id], ct);
+        if (tx is not null)
+        {
+            tx.CurrentStatus = newStatus;
+            if (isPaused.HasValue)
+                tx.IsPaused = isPaused.Value;
+        }
+    }
+
+    public Task SaveChangesAsync(CancellationToken ct = default) =>
+        db.SaveChangesAsync(ct);
 }

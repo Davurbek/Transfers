@@ -5,6 +5,7 @@ namespace Universal.Transfers.Domain.Transactions.Entities;
 public class Transaction
 {
     public Guid Id { get; set; } = Guid.NewGuid();
+    public string InternalRef { get; set; } = string.Empty;
     public string TransactionId { get; set; } = string.Empty;
     public string UserId { get; set; } = string.Empty;
     public string RecipientName { get; set; } = string.Empty;

@@ -10,6 +10,7 @@ using Universal.Transfers.Infrastructure.Transactions.Persistence;
 using Universal.Transfers.Infrastructure.Transactions.Messaging;
 using Universal.Transfers.Infrastructure.Audit.Persistence;
 using Universal.Transfers.Application.Messaging;
+using Universal.Transfers.Infrastructure.Messaging.Kafka;
 
 namespace Universal.Transfers.Infrastructure;
 
@@ -31,6 +32,18 @@ public static class DependencyInjection
         services.AddScoped<IAuditRepository, AuditRepository>();
 
         services.AddScoped<IEventProjector, EventProjector>();
+
+        return services;
+    }
+
+    public static IServiceCollection AddKafkaMessaging(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        services.Configure<KafkaOptions>(configuration.GetSection(KafkaOptions.SectionName));
+
+        services.AddSingleton<ICommandPublisher, KafkaCommandPublisher>();
+        services.AddHostedService<KafkaEventConsumer>();
 
         return services;
     }

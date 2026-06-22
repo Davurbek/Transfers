@@ -50,9 +50,10 @@ public sealed class SimulatedBroker(
         switch (command)
         {
             case UnpauseTransactionCommand unpause:
+                var txRef = unpause.TransactionId;
                 await EmitAsync(new TransactionStatusChanged
                 {
-                    TransactionId = unpause.TransactionId,
+                    TransactionId = txRef,
                     FromStatus = TransactionStatus.Paused,
                     ToStatus = TransactionStatus.RegistrationFailedRetry,
                     Reason = $"Unpaused by {unpause.IssuedByUser}; retrying partner registration",
@@ -63,7 +64,7 @@ public sealed class SimulatedBroker(
 
                 await EmitAsync(new TransactionStatusChanged
                 {
-                    TransactionId = unpause.TransactionId,
+                    TransactionId = txRef,
                     FromStatus = TransactionStatus.RegistrationFailedRetry,
                     ToStatus = TransactionStatus.RegistrationSucceeded,
                     Reason = "Partner registration succeeded after manual unpause",

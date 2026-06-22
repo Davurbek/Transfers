@@ -20,6 +20,7 @@ export interface LoginCredentials {
 }
 
 export interface TransactionSummary {
+  internalRef: string
   transactionId: string
   userId: string
   recipientName: string
@@ -57,6 +58,7 @@ export interface PartnerRegistration {
 }
 
 export interface TransactionDetail {
+  internalRef: string
   transactionId: string
   userId: string
   recipientName: string

@@ -31,9 +31,17 @@ var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get
 builder.Services.AddInfrastructureServices(builder.Configuration);
 builder.Services.AddApplicationServices();
 
-builder.Services.AddSingleton<SimulatedBroker>();
-builder.Services.AddSingleton<ICommandPublisher>(sp => sp.GetRequiredService<SimulatedBroker>());
-builder.Services.AddHostedService(sp => sp.GetRequiredService<SimulatedBroker>());
+var useKafka = builder.Configuration.GetValue<bool>("Kafka:Enabled");
+if (useKafka)
+{
+    builder.Services.AddKafkaMessaging(builder.Configuration);
+}
+else
+{
+    builder.Services.AddSingleton<SimulatedBroker>();
+    builder.Services.AddSingleton<ICommandPublisher>(sp => sp.GetRequiredService<SimulatedBroker>());
+    builder.Services.AddHostedService(sp => sp.GetRequiredService<SimulatedBroker>());
+}
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>

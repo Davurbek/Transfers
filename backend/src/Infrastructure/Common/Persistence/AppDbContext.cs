@@ -75,6 +75,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
         b.Entity<Transaction>(e =>
         {
+            e.HasIndex(x => x.InternalRef).IsUnique().HasFilter("[InternalRef] IS NOT NULL AND [InternalRef] <> ''");
             e.HasIndex(x => x.TransactionId).IsUnique();
             e.HasIndex(x => x.UserId);
             e.HasIndex(x => x.CreatedAt);

@@ -3,6 +3,7 @@ using Universal.Transfers.Domain.Transactions.Enums;
 namespace Universal.Transfers.Application.Transactions.DTOs;
 
 public record TransactionListItemDto(
+    string InternalRef,
     string TransactionId,
     string UserId,
     string RecipientName,
@@ -15,6 +16,7 @@ public record TransactionListItemDto(
     DateTimeOffset UpdatedAt);
 
 public record TransactionDetailDto(
+    string InternalRef,
     string TransactionId,
     string UserId,
     string RecipientName,

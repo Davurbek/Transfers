@@ -25,13 +25,26 @@ public class EventProjector(
         }
     }
 
+    private static string ResolveInternalRef(string transactionId, string? internalRef) =>
+        !string.IsNullOrWhiteSpace(internalRef) ? internalRef : $"intref-{transactionId}";
+
     private async Task ProjectUpsertedAsync(TransactionUpserted e, CancellationToken ct)
     {
         var existing = await txRepo.GetByTransactionIdAsync(e.TransactionId, ct);
-        if (existing is not null) return;
+        if (existing is not null)
+        {
+            if (string.IsNullOrWhiteSpace(existing.InternalRef) && !string.IsNullOrWhiteSpace(e.InternalRef))
+            {
+                existing.InternalRef = e.InternalRef;
+                await txRepo.SaveChangesAsync(ct);
+                logger.LogInformation("Backfilled InternalRef for {TxId}", e.TransactionId);
+            }
+            return;
+        }
 
         var tx = new Transaction
         {
+            InternalRef = ResolveInternalRef(e.TransactionId, e.InternalRef),
             TransactionId = e.TransactionId,
             UserId = e.UserId,
             RecipientName = e.RecipientName,
@@ -44,19 +57,31 @@ public class EventProjector(
             UpdatedAt = e.UpdatedAt,
         };
         await txRepo.AddAsync(tx, ct);
+        await txRepo.SaveChangesAsync(ct);
         logger.LogInformation("Projected TransactionUpserted for {TxId}", e.TransactionId);
     }
 
     private async Task ProjectStatusChangedAsync(TransactionStatusChanged e, CancellationToken ct)
     {
-        var tx = await txRepo.GetByTransactionIdAsync(e.TransactionId, ct);
+        var tx = string.IsNullOrEmpty(e.InternalRef)
+            ? await txRepo.GetByTransactionIdAsync(e.TransactionId, ct)
+            : await txRepo.GetByInternalRefAsync(e.InternalRef, ct)
+              ?? await txRepo.GetByTransactionIdAsync(e.TransactionId, ct);
         if (tx is null)
         {
             logger.LogWarning("Transaction {TxId} not found for status change", e.TransactionId);
             return;
         }
 
-        if (await txRepo.StatusEventExistsAsync($"{e.TransactionId}-{e.ToStatus}", ct)) return;
+        if (string.IsNullOrWhiteSpace(tx.InternalRef))
+        {
+            tx.InternalRef = ResolveInternalRef(e.TransactionId, e.InternalRef);
+            logger.LogInformation("Backfilled InternalRef for {TxId}", e.TransactionId);
+        }
+
+        var internalRef = !string.IsNullOrWhiteSpace(tx.InternalRef) ? tx.InternalRef : e.TransactionId;
+        var eventId = $"{internalRef}-{e.ToStatus}";
+        if (await txRepo.StatusEventExistsAsync(eventId, ct)) return;
 
         txRepo.AddStatusHistory(new TransactionStatusHistory
         {
@@ -65,8 +90,12 @@ public class EventProjector(
             ToStatus = e.ToStatus,
             Reason = e.Reason,
             OccurredAt = DateTimeOffset.UtcNow,
-            EventId = $"{e.TransactionId}-{e.ToStatus}",
+            EventId = eventId,
         });
+
+        await txRepo.UpdateCurrentStatusAsync(tx.Id, e.ToStatus, e.IsPaused, ct);
+        await txRepo.SaveChangesAsync(ct);
+
         logger.LogInformation("Projected TransactionStatusChanged for {TxId}: {From} -> {To}",
             e.TransactionId, e.FromStatus, e.ToStatus);
     }

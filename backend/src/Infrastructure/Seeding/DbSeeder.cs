@@ -13,6 +13,7 @@ public static class DbSeeder
     public static async Task SeedAsync(AppDbContext db, string demoPassword)
     {
         await db.Database.EnsureCreatedAsync();
+        await MigrateSchemaAsync(db);
 
         if (!await db.Permissions.AnyAsync())
             await SeedAuthAsync(db, demoPassword);
@@ -22,6 +23,20 @@ public static class DbSeeder
 
         if (!await db.AuditLogs.AnyAsync())
             await SeedAuditAsync(db);
+    }
+
+    private static async Task MigrateSchemaAsync(AppDbContext db)
+    {
+        await using var cmd = db.Database.GetDbConnection().CreateCommand();
+        cmd.CommandText = @"
+            IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('Transactions') AND name = 'InternalRef')
+                ALTER TABLE Transactions ADD InternalRef NVARCHAR(MAX) NOT NULL DEFAULT '';
+            IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('Transactions') AND name = 'IsPaused')
+                ALTER TABLE Transactions ADD IsPaused BIT NOT NULL DEFAULT 0;
+        ";
+        if (cmd.Connection!.State != System.Data.ConnectionState.Open)
+            await cmd.Connection.OpenAsync();
+        await cmd.ExecuteNonQueryAsync();
     }
 
     private static async Task SeedAuthAsync(AppDbContext db, string demoPassword)
@@ -105,6 +120,7 @@ public static class DbSeeder
 
         var tx1 = new Transaction
         {
+            InternalRef = "intref-tx-1001",
             TransactionId = "TX-1001",
             UserId = "user-77",
             RecipientName = "Alisher Karimov",
@@ -119,10 +135,8 @@ public static class DbSeeder
         AddHistory(tx1,
             (null, TransactionStatus.ConfirmPending, "Created", -120),
             (TransactionStatus.ConfirmPending, TransactionStatus.ConfirmSucceeded, "Sender confirmed", -118),
-            (TransactionStatus.ConfirmSucceeded, TransactionStatus.CreditPending, "Crediting recipient", -117),
-            (TransactionStatus.CreditPending, TransactionStatus.CreditSucceeded, "Humo credit ok", -115),
-            (TransactionStatus.CreditSucceeded, TransactionStatus.RegistrationPending, "Registering with partner", -112),
-            (TransactionStatus.RegistrationPending, TransactionStatus.RegistrationSucceeded, "Partner ack", -100));
+            (TransactionStatus.ConfirmSucceeded, TransactionStatus.CreditSucceeded, "Humo credit ok", -115),
+            (TransactionStatus.CreditSucceeded, TransactionStatus.RegistrationSucceeded, "Partner ack", -100));
         tx1.CreditAttempts.Add(new CreditAttempt
         {
             AttemptNumber = 1, Gateway = CreditGateway.Humo, Status = OperationResult.Succeeded,
@@ -136,6 +150,7 @@ public static class DbSeeder
 
         var tx2 = new Transaction
         {
+            InternalRef = "intref-tx-1002",
             TransactionId = "TX-1002",
             UserId = "user-77",
             RecipientName = "Dilnoza Yusupova",
@@ -150,10 +165,8 @@ public static class DbSeeder
         AddHistory(tx2,
             (null, TransactionStatus.ConfirmPending, "Created", -60),
             (TransactionStatus.ConfirmPending, TransactionStatus.ConfirmSucceeded, "Sender confirmed", -58),
-            (TransactionStatus.ConfirmSucceeded, TransactionStatus.CreditPending, "Crediting recipient", -57),
-            (TransactionStatus.CreditPending, TransactionStatus.CreditSucceeded, "Uzcard credit ok (2nd try)", -50),
-            (TransactionStatus.CreditSucceeded, TransactionStatus.RegistrationPending, "Registering with partner", -48),
-            (TransactionStatus.RegistrationPending, TransactionStatus.RegistrationFailedRetry, "Partner timeout", -40),
+            (TransactionStatus.ConfirmSucceeded, TransactionStatus.CreditSucceeded, "Uzcard credit ok (2nd try)", -50),
+            (TransactionStatus.CreditSucceeded, TransactionStatus.RegistrationFailedRetry, "Partner timeout", -40),
             (TransactionStatus.RegistrationFailedRetry, TransactionStatus.Paused, "Max retries reached - paused", -30));
         tx2.CreditAttempts.Add(new CreditAttempt
         {
@@ -174,21 +187,21 @@ public static class DbSeeder
 
         var tx3 = new Transaction
         {
+            InternalRef = "intref-tx-1003",
             TransactionId = "TX-1003",
             UserId = "user-91",
             RecipientName = "Bekzod Tursunov",
             Amount = 75.00m,
             Currency = "USD",
             Corridor = "US->UZ",
-            CurrentStatus = TransactionStatus.CreditPending,
+            CurrentStatus = TransactionStatus.ConfirmSucceeded,
             IsPaused = false,
             CreatedAt = now.AddMinutes(-8),
             UpdatedAt = now.AddMinutes(-5),
         };
         AddHistory(tx3,
             (null, TransactionStatus.ConfirmPending, "Created", -8),
-            (TransactionStatus.ConfirmPending, TransactionStatus.ConfirmSucceeded, "Sender confirmed", -6),
-            (TransactionStatus.ConfirmSucceeded, TransactionStatus.CreditPending, "Crediting recipient", -5));
+            (TransactionStatus.ConfirmPending, TransactionStatus.ConfirmSucceeded, "Sender confirmed", -6));
 
         db.Transactions.AddRange(tx1, tx2, tx3);
         await db.SaveChangesAsync();
