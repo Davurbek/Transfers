@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Universal.Transfers.Domain.Auth.Entities;
 using Universal.Transfers.Domain.Audit.Entities;
+using Universal.Transfers.Domain.Inbox.Entities;
 using Universal.Transfers.Domain.Transactions.Entities;
 
 namespace Universal.Transfers.Infrastructure.Common.Persistence;
@@ -21,6 +22,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<PartnerRegistration> PartnerRegistrations => Set<PartnerRegistration>();
 
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<ProcessedMessage> ProcessedMessages => Set<ProcessedMessage>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -121,5 +123,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.HasIndex(x => x.ActionType);
             e.Property(x => x.ActionType).HasMaxLength(64).IsRequired();
         });
+
+        b.ApplyConfiguration(new Universal.Transfers.Infrastructure.Inbox.Persistence.Configurations.ProcessedMessageConfiguration());
     }
 }

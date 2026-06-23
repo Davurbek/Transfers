@@ -56,6 +56,22 @@ public class EventProjector(
             CreatedAt = e.CreatedAt,
             UpdatedAt = e.UpdatedAt,
         };
+
+        var internalRef = tx.InternalRef;
+        var statusEventId = $"{internalRef}-{e.CurrentStatus}";
+        if (!await txRepo.StatusEventExistsAsync(statusEventId, ct))
+        {
+            txRepo.AddStatusHistory(new TransactionStatusHistory
+            {
+                TransactionId = tx.Id,
+                FromStatus = null,
+                ToStatus = e.CurrentStatus,
+                Reason = "Transaction initiated",
+                OccurredAt = e.UpdatedAt,
+                EventId = statusEventId,
+            });
+        }
+
         await txRepo.AddAsync(tx, ct);
         await txRepo.SaveChangesAsync(ct);
         logger.LogInformation("Projected TransactionUpserted for {TxId}", e.TransactionId);
@@ -86,10 +102,10 @@ public class EventProjector(
         txRepo.AddStatusHistory(new TransactionStatusHistory
         {
             TransactionId = tx.Id,
-            FromStatus = e.FromStatus,
+            FromStatus = e.FromStatus ?? tx.CurrentStatus,
             ToStatus = e.ToStatus,
             Reason = e.Reason,
-            OccurredAt = DateTimeOffset.UtcNow,
+            OccurredAt = e.OccurredAt,
             EventId = eventId,
         });
 

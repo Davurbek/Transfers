@@ -9,9 +9,12 @@ using Universal.Transfers.Api.Messaging;
 using Universal.Transfers.Application;
 using Universal.Transfers.Application.Auth;
 using Universal.Transfers.Application.Messaging;
+using Microsoft.EntityFrameworkCore;
 using Universal.Transfers.Infrastructure;
 using Universal.Transfers.Infrastructure.Common.Persistence;
+using Universal.Transfers.Infrastructure.Messaging.Kafka;
 using Universal.Transfers.Infrastructure.Seeding;
+using Universal.Transfers.Infrastructure.Messaging.MassTransit;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -28,11 +31,24 @@ builder.Services.AddInfrastructureServices(builder.Configuration);
 builder.Services.AddApplicationServices();
 
 var useKafka = builder.Configuration.GetValue<bool>("Kafka:Enabled");
+var useMassTransit = builder.Configuration.GetValue<bool>("MassTransit:Enabled");
+
+if (useMassTransit)
+{
+    builder.Services.AddMassTransitMessaging(builder.Configuration);
+}
+
 if (useKafka)
 {
     builder.Services.AddKafkaMessaging(builder.Configuration);
 }
-else
+
+if (useKafka || useMassTransit)
+{
+    builder.Services.AddSingleton<ICommandPublisher, KafkaCommandPublisher>();
+}
+
+if (!useKafka && !useMassTransit)
 {
     builder.Services.AddSingleton<SimulatedBroker>();
     builder.Services.AddSingleton<ICommandPublisher>(sp => sp.GetRequiredService<SimulatedBroker>());
@@ -133,6 +149,16 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    await db.Database.EnsureCreatedAsync();
+    await db.Database.ExecuteSqlRawAsync(@"
+        IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'InboxMessages')
+        CREATE TABLE [dbo].[InboxMessages] (
+            [Id] BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+            [IdempotencyKey] NVARCHAR(200) NOT NULL,
+            [EventType] NVARCHAR(500) NOT NULL,
+            [ProcessedAt] DATETIME2 NOT NULL,
+            CONSTRAINT [UQ_InboxMessages_IdempotencyKey] UNIQUE ([IdempotencyKey])
+        )");
     await DbSeeder.SeedAsync(db, demoPassword);
 }
 

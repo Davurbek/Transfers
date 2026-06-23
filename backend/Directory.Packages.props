@@ -18,7 +18,9 @@
     <PackageVersion Include="System.IdentityModel.Tokens.Jwt" Version="8.2.1" />
     <PackageVersion Include="Swashbuckle.AspNetCore" Version="7.2.0" />
     <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.5" />
-    <PackageVersion Include="Confluent.Kafka" Version="2.8.0" />
+    <PackageVersion Include="Confluent.Kafka" Version="2.13.0" />
+    <PackageVersion Include="MassTransit" Version="8.5.8" />
+    <PackageVersion Include="MassTransit.Kafka" Version="8.5.8" />
 
     <!-- Test packages -->
     <PackageVersion Include="xunit.v3" Version="3.2.2" />

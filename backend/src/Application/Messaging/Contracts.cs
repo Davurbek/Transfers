@@ -29,8 +29,9 @@ public class TransactionStatusChanged : TransferEvent
 {
     public string InternalRef { get; init; } = string.Empty;
     public string TransactionId { get; init; } = string.Empty;
-    public TransactionStatus FromStatus { get; init; }
+    public TransactionStatus? FromStatus { get; init; }
     public TransactionStatus ToStatus { get; init; }
     public string Reason { get; init; } = string.Empty;
     public bool IsPaused { get; init; }
+    public DateTimeOffset OccurredAt { get; init; }
 }

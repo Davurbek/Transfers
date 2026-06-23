@@ -4,11 +4,13 @@ using Microsoft.Extensions.DependencyInjection;
 using Universal.Transfers.Domain.Auth.Interfaces;
 using Universal.Transfers.Domain.Transactions.Interfaces;
 using Universal.Transfers.Domain.Audit.Interfaces;
+using Universal.Transfers.Domain.Inbox.Interfaces;
 using Universal.Transfers.Infrastructure.Common.Persistence;
 using Universal.Transfers.Infrastructure.Auth.Persistence;
 using Universal.Transfers.Infrastructure.Transactions.Persistence;
 using Universal.Transfers.Infrastructure.Transactions.Messaging;
 using Universal.Transfers.Infrastructure.Audit.Persistence;
+using Universal.Transfers.Infrastructure.Inbox.Persistence;
 using Universal.Transfers.Application.Messaging;
 using Universal.Transfers.Infrastructure.Messaging.Kafka;
 
@@ -30,6 +32,8 @@ public static class DependencyInjection
         services.AddScoped<IPermissionRepository, PermissionRepository>();
         services.AddScoped<ITransactionRepository, TransactionRepository>();
         services.AddScoped<IAuditRepository, AuditRepository>();
+
+        services.AddScoped<IProcessedMessageRepository, ProcessedMessageRepository>();
 
         services.AddScoped<IEventProjector, EventProjector>();
 
