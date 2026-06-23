@@ -23,6 +23,8 @@ public class TransactionUpserted : TransferEvent
     public bool IsPaused { get; init; }
     public DateTimeOffset CreatedAt { get; init; }
     public DateTimeOffset UpdatedAt { get; init; }
+    public CreditGateway? CreditGateway { get; init; }
+    public string? RemitterPartner { get; init; }
 }
 
 public class TransactionStatusChanged : TransferEvent
@@ -34,4 +36,7 @@ public class TransactionStatusChanged : TransferEvent
     public string Reason { get; init; } = string.Empty;
     public bool IsPaused { get; init; }
     public DateTimeOffset OccurredAt { get; init; }
+    public int? AttemptNumber { get; init; }
+    public string? FailureReason { get; init; }
+    public string? PartnerName { get; init; }
 }

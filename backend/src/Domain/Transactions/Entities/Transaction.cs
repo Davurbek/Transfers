@@ -16,6 +16,8 @@ public class Transaction
     public bool IsPaused { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+    public CreditGateway CreditGateway { get; set; }
+    public string RemitterPartner { get; set; } = string.Empty;
 
     public ICollection<TransactionStatusHistory> StatusHistory { get; set; } = new List<TransactionStatusHistory>();
     public ICollection<CreditAttempt> CreditAttempts { get; set; } = new List<CreditAttempt>();

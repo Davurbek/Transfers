@@ -13,6 +13,9 @@ public interface ITransactionRepository
     Task AddAsync(Transaction transaction, CancellationToken ct = default);
     void AddStatusHistory(TransactionStatusHistory history);
     Task<bool> StatusEventExistsAsync(string eventId, CancellationToken ct = default);
+    Task<bool> CreditAttemptExistsAsync(string eventId, CancellationToken ct = default);
+    Task<bool> PartnerRegistrationExistsAsync(string eventId, CancellationToken ct = default);
     Task UpdateCurrentStatusAsync(Guid id, TransactionStatus newStatus, bool? isPaused = null, CancellationToken ct = default);
     Task SaveChangesAsync(CancellationToken ct = default);
+    void DetachAddedEntities();
 }

@@ -159,6 +159,15 @@ using (var scope = app.Services.CreateScope())
             [ProcessedAt] DATETIME2 NOT NULL,
             CONSTRAINT [UQ_InboxMessages_IdempotencyKey] UNIQUE ([IdempotencyKey])
         )");
+    await db.Database.ExecuteSqlRawAsync(@"
+        IF COL_LENGTH('dbo.Transactions', 'CreditGateway') IS NULL
+        ALTER TABLE [dbo].[Transactions] ADD [CreditGateway] NVARCHAR(32) NOT NULL DEFAULT 'Humo';
+        IF COL_LENGTH('dbo.Transactions', 'RemitterPartner') IS NULL
+        ALTER TABLE [dbo].[Transactions] ADD [RemitterPartner] NVARCHAR(32) NOT NULL DEFAULT '';
+        IF COL_LENGTH('dbo.CreditAttempts', 'EventId') IS NULL
+        ALTER TABLE [dbo].[CreditAttempts] ADD [EventId] NVARCHAR(200) NULL;
+        IF COL_LENGTH('dbo.PartnerRegistrations', 'EventId') IS NULL
+        ALTER TABLE [dbo].[PartnerRegistrations] ADD [EventId] NVARCHAR(200) NULL;");
     await DbSeeder.SeedAsync(db, demoPassword);
 }
 

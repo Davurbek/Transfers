@@ -87,6 +87,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.Amount).HasPrecision(18, 2);
             e.Property(x => x.Currency).HasMaxLength(3);
             e.Property(x => x.CurrentStatus).HasConversion<string>();
+            e.Property(x => x.CreditGateway).HasConversion<string>();
+            e.Property(x => x.RemitterPartner).HasMaxLength(32);
         });
 
         b.Entity<TransactionStatusHistory>(e =>
@@ -103,6 +105,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         {
             e.HasIndex(x => x.TransactionId);
             e.HasIndex(x => x.AttemptedAt);
+            e.HasIndex(x => x.EventId).IsUnique().HasFilter("[EventId] IS NOT NULL");
             e.Property(x => x.Gateway).HasConversion<string>();
             e.Property(x => x.Status).HasConversion<string>();
             e.HasOne(x => x.Transaction).WithMany(t => t.CreditAttempts).HasForeignKey(x => x.TransactionId);
@@ -112,6 +115,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         {
             e.HasIndex(x => x.TransactionId);
             e.HasIndex(x => x.RegisteredAt);
+            e.HasIndex(x => x.EventId).IsUnique().HasFilter("[EventId] IS NOT NULL");
             e.Property(x => x.Status).HasConversion<string>();
             e.HasOne(x => x.Transaction).WithMany(t => t.PartnerRegistrations).HasForeignKey(x => x.TransactionId);
         });

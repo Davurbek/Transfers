@@ -66,6 +66,12 @@ public sealed class TransactionRepository(AppDbContext db) : ITransactionReposit
     public Task<bool> StatusEventExistsAsync(string eventId, CancellationToken ct = default) =>
         db.TransactionStatusHistory.AnyAsync(h => h.EventId == eventId, ct);
 
+    public Task<bool> CreditAttemptExistsAsync(string eventId, CancellationToken ct = default) =>
+        db.CreditAttempts.AnyAsync(c => c.EventId == eventId, ct);
+
+    public Task<bool> PartnerRegistrationExistsAsync(string eventId, CancellationToken ct = default) =>
+        db.PartnerRegistrations.AnyAsync(p => p.EventId == eventId, ct);
+
     public async Task UpdateCurrentStatusAsync(Guid id, TransactionStatus newStatus, bool? isPaused = null, CancellationToken ct = default)
     {
         var tx = await db.Transactions.FindAsync([id], ct);
@@ -77,6 +83,14 @@ public sealed class TransactionRepository(AppDbContext db) : ITransactionReposit
         }
     }
 
-    public Task SaveChangesAsync(CancellationToken ct = default) =>
-        db.SaveChangesAsync(ct);
+    public async Task SaveChangesAsync(CancellationToken ct = default) =>
+        await db.SaveChangesAsync(ct);
+
+    public void DetachAddedEntities()
+    {
+        foreach (var entry in db.ChangeTracker.Entries().Where(e => e.State == EntityState.Added))
+        {
+            entry.State = EntityState.Detached;
+        }
+    }
 }

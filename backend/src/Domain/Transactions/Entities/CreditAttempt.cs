@@ -13,4 +13,5 @@ public class CreditAttempt
     public string? FailureCode { get; set; }
     public string? GatewayResponse { get; set; }
     public DateTimeOffset AttemptedAt { get; set; } = DateTimeOffset.UtcNow;
+    public string? EventId { get; set; }
 }

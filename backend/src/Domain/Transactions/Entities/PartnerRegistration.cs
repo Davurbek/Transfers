@@ -12,4 +12,5 @@ public class PartnerRegistration
     public string? FailureReason { get; set; }
     public string? ReferenceId { get; set; }
     public DateTimeOffset RegisteredAt { get; set; } = DateTimeOffset.UtcNow;
+    public string? EventId { get; set; }
 }
