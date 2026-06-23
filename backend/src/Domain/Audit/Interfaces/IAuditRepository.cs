@@ -7,4 +7,5 @@ public interface IAuditRepository
 {
     Task<PagedResult<AuditLog>> SearchAsync(AuditFilter filter, CancellationToken ct = default);
     Task AddAsync(AuditLog log, CancellationToken ct = default);
+    Task SaveChangesAsync(CancellationToken ct = default);
 }

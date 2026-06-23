@@ -12,4 +12,7 @@ public sealed class RefreshTokenRepository(AppDbContext db) : IRefreshTokenRepos
 
     public Task<RefreshToken?> GetByHashAsync(string tokenHash, CancellationToken ct = default) =>
         db.RefreshTokens.Include(t => t.User).FirstOrDefaultAsync(t => t.TokenHash == tokenHash, ct);
+
+    public Task SaveChangesAsync(CancellationToken ct = default) =>
+        db.SaveChangesAsync(ct);
 }

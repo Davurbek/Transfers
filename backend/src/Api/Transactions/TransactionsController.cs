@@ -20,8 +20,8 @@ public class TransactionsController(ITransactionService transactionService) : Co
         [FromQuery] bool? isPaused,
         [FromQuery] DateTimeOffset? fromDate,
         [FromQuery] DateTimeOffset? toDate,
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 20,
+        [FromQuery] int page,
+        [FromQuery] int pageSize,
         CancellationToken ct = default)
     {
         var result = await transactionService.SearchAsync(search, status, userId, isPaused, fromDate, toDate, page, pageSize, ct);
@@ -49,7 +49,7 @@ public class TransactionsController(ITransactionService transactionService) : Co
 
         return result.Outcome switch
         {
-            UnpauseOutcome.Accepted => Accepted(new { commandId = result.CommandId }),
+            UnpauseOutcome.Accepted => Accepted(new { message = "Unpause command accepted", transactionId = id, commandId = result.CommandId }),
             UnpauseOutcome.NotFound => NotFound(new { message = "Transaction not found" }),
             UnpauseOutcome.NotPaused => BadRequest(new { message = "Transaction is not paused" }),
             _ => StatusCode(500),

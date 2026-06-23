@@ -17,8 +17,8 @@ public class AuditController(IAuditService auditService) : ControllerBase
         [FromQuery] string? username,
         [FromQuery] DateTimeOffset? fromDate,
         [FromQuery] DateTimeOffset? toDate,
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 50,
+        [FromQuery] int page,
+        [FromQuery] int pageSize,
         CancellationToken ct = default)
     {
         var result = await auditService.SearchAsync(targetTransactionId, actionType, username, fromDate, toDate, page, pageSize, ct);

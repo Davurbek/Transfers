@@ -34,6 +34,7 @@ public class AuthService(
             ExpiresAt = DateTimeOffset.UtcNow.AddDays(7),
             CreatedByIp = ipAddress,
         }, ct);
+        await refreshTokenRepo.SaveChangesAsync(ct);
 
         var expiresAt = DateTime.UtcNow.AddMinutes(_jwt.AccessTokenMinutes);
         var userInfo = new UserInfoResponse(user.Id, user.Username, user.Email, permissions, roles);
@@ -48,6 +49,7 @@ public class AuthService(
             return new LoginServiceResult(false, null, null, "Invalid or expired refresh token");
 
         stored.RevokedAt = DateTimeOffset.UtcNow;
+        await refreshTokenRepo.SaveChangesAsync(ct);
 
         var user = stored.User;
         var permissions = (await permissionService.GetUserPermissionsAsync(user.Id, ct)).ToList();
@@ -64,6 +66,7 @@ public class AuthService(
             ExpiresAt = DateTimeOffset.UtcNow.AddDays(7),
             CreatedByIp = ipAddress,
         }, ct);
+        await refreshTokenRepo.SaveChangesAsync(ct);
 
         var expiresAt = DateTime.UtcNow.AddMinutes(_jwt.AccessTokenMinutes);
         var userInfo = new UserInfoResponse(user.Id, user.Username, user.Email, permissions, roles);
@@ -75,7 +78,10 @@ public class AuthService(
         var hash = tokenService.HashToken(refreshToken);
         var stored = await refreshTokenRepo.GetByHashAsync(hash, ct);
         if (stored is not null)
+        {
             stored.RevokedAt = DateTimeOffset.UtcNow;
+            await refreshTokenRepo.SaveChangesAsync(ct);
+        }
     }
 
     public async Task<UserInfoResponse?> GetCurrentUserAsync(Guid userId, CancellationToken ct = default)

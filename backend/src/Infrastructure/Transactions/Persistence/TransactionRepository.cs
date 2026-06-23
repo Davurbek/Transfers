@@ -45,10 +45,10 @@ public sealed class TransactionRepository(AppDbContext db) : ITransactionReposit
     }
 
     public Task<Transaction?> GetByTransactionIdAsync(string transactionId, CancellationToken ct = default) =>
-        db.Transactions.AsNoTracking().FirstOrDefaultAsync(t => t.TransactionId == transactionId, ct);
+        db.Transactions.FirstOrDefaultAsync(t => t.TransactionId == transactionId, ct);
 
     public Task<Transaction?> GetByInternalRefAsync(string internalRef, CancellationToken ct = default) =>
-        db.Transactions.AsNoTracking().FirstOrDefaultAsync(t => t.InternalRef == internalRef, ct);
+        db.Transactions.FirstOrDefaultAsync(t => t.InternalRef == internalRef, ct);
 
     public Task<Transaction?> GetDetailAsync(string transactionId, CancellationToken ct = default) =>
         db.Transactions.AsNoTracking()

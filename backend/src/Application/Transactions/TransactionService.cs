@@ -32,8 +32,12 @@ public class TransactionService(
             PageSize = pageSize,
         };
 
-        if (Enum.TryParse<Domain.Transactions.Enums.TransactionStatus>(status, ignoreCase: true, out var parsed))
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            if (!Enum.TryParse<Domain.Transactions.Enums.TransactionStatus>(status, ignoreCase: true, out var parsed))
+                throw new ArgumentException($"Invalid status value: '{status}'");
             filter.Status = parsed;
+        }
 
         var paged = await txRepo.SearchAsync(filter, ct);
         return paged.Map(TransactionMappings.ToListItemDto);
@@ -51,7 +55,7 @@ public class TransactionService(
         if (tx is null)
             return new UnpauseResult(UnpauseOutcome.NotFound, null);
 
-        if (!tx.IsPaused && tx.CurrentStatus != Domain.Transactions.Enums.TransactionStatus.Paused)
+        if (!tx.IsPaused || tx.CurrentStatus != Domain.Transactions.Enums.TransactionStatus.Paused)
             return new UnpauseResult(UnpauseOutcome.NotPaused, null);
 
         var command = new UnpauseTransactionCommand(transactionId, username);
@@ -67,6 +71,7 @@ public class TransactionService(
             Metadata = """{"source":"dashboard"}""",
         };
         await auditRepo.AddAsync(audit, ct);
+        await auditRepo.SaveChangesAsync(ct);
 
         logger.LogInformation("Unpause command published for {TxId} by {User}", transactionId, username);
         return new UnpauseResult(UnpauseOutcome.Accepted, command.CommandId);

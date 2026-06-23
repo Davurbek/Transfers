@@ -2,8 +2,6 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
-using System.Diagnostics;
-using System.Net.Sockets;
 using System.Text;
 using System.Threading.RateLimiting;
 using Universal.Transfers.Api.Auth;
@@ -14,8 +12,6 @@ using Universal.Transfers.Application.Messaging;
 using Universal.Transfers.Infrastructure;
 using Universal.Transfers.Infrastructure.Common.Persistence;
 using Universal.Transfers.Infrastructure.Seeding;
-
-FreePort();
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -83,14 +79,19 @@ builder.Services.AddRateLimiter(options =>
             }));
 
     options.AddPolicy("mutations", httpContext =>
-        RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: httpContext.User.GetUserId().ToString(),
+    {
+        var userId = httpContext.User.Identity?.IsAuthenticated == true
+            ? httpContext.User.GetUserId().ToString()
+            : httpContext.Connection.RemoteIpAddress?.ToString() ?? "anon";
+        return RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: userId,
             factory: _ => new FixedWindowRateLimiterOptions
             {
                 PermitLimit = mutationRateLimit.PermitLimit,
                 Window = TimeSpan.FromMinutes(mutationRateLimit.WindowMinutes),
                 QueueLimit = 0,
-            }));
+            });
+    });
 });
 
 builder.Services.AddCors(options =>
@@ -144,26 +145,10 @@ if (app.Environment.IsDevelopment())
 app.UseRouting();
 app.UseCors(CorsPolicy);
 app.UseAuthentication();
-app.UseRateLimiter();
 app.UseAuthorization();
+app.UseRateLimiter();
 
 app.MapControllers();
 app.MapGet("/health", () => Results.Ok(new { status = "ok" })).AllowAnonymous();
 
 app.Run();
-
-static void FreePort()
-{
-    var url = Environment.GetEnvironmentVariable("ASPNETCORE_URLS")
-              ?? "http://localhost:5290";
-    var port = new Uri(url.Split(';').First()).Port;
-
-    var psi = new ProcessStartInfo("powershell",
-        $"-NoProfile -Command \"Get-NetTCPConnection -LocalPort {port} -State Listen -ErrorAction SilentlyContinue | ForEach-Object {{ Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }}\"")
-    {
-        CreateNoWindow = true,
-        UseShellExecute = false,
-    };
-    using var p = Process.Start(psi)!;
-    p.WaitForExit(5000);
-}

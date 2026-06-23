@@ -9,4 +9,5 @@ public class KafkaOptions
     public string EventsTopic { get; init; } = "transfers-events";
     public string GroupId { get; init; } = "transfers-dashboard";
     public string ClientId { get; init; } = "transfers-dashboard";
+    public string DlqTopic { get; init; } = "transfers-events-dlq";
 }

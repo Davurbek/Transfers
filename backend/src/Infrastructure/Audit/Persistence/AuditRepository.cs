@@ -39,4 +39,7 @@ public sealed class AuditRepository(AppDbContext db) : IAuditRepository
 
     public async Task AddAsync(AuditLog log, CancellationToken ct = default) =>
         await db.AuditLogs.AddAsync(log, ct);
+
+    public Task SaveChangesAsync(CancellationToken ct = default) =>
+        db.SaveChangesAsync(ct);
 }
