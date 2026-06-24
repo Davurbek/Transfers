@@ -124,9 +124,10 @@ onMounted(load)
   margin-bottom: 20px;
 }
 .page-header h1 {
-  font-size: 24px;
-  font-weight: 700;
+  font-size: 26px;
+  font-weight: 800;
   margin: 0 0 4px;
+  letter-spacing: -0.03em;
 }
 .page-header p {
   font-size: 13px;
@@ -158,14 +159,19 @@ onMounted(load)
 .clickable-row {
   cursor: pointer;
 }
+.clickable-row:hover td {
+  background: rgba(255, 255, 255, 0.02);
+}
 .amount {
-  font-weight: 600;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
+  color: var(--success);
 }
 .empty-state {
   text-align: center;
   color: var(--text-dim);
   padding: 40px 16px !important;
+  font-weight: 500;
 }
 .error-state {
   padding: 40px 24px;

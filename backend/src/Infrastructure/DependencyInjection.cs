@@ -22,7 +22,8 @@ public static class DependencyInjection
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        var connectionString = configuration.GetConnectionString("Dashboard");
+        var connectionString = configuration.GetConnectionString("Dashboard")
+            ?? throw new InvalidOperationException("ConnectionStrings:Dashboard is not configured.");
 
         services.AddDbContext<AppDbContext>(opt => opt
             .UseSqlServer(connectionString, sql => sql.CommandTimeout(120)));

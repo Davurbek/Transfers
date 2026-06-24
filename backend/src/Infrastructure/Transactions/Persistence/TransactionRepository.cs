@@ -19,20 +19,20 @@ public sealed class TransactionRepository(AppDbContext db) : ITransactionReposit
             query = query.Where(t => t.TransactionId.Contains(term) || t.RecipientName.Contains(term));
         }
 
-        if (filter.Status is { } status)
-            query = query.Where(t => t.CurrentStatus == status);
+        if (filter.Status is not null)
+            query = query.Where(t => t.CurrentStatus == filter.Status);
 
         if (!string.IsNullOrWhiteSpace(filter.UserId))
             query = query.Where(t => t.UserId == filter.UserId);
 
-        if (filter.IsPaused is { } paused)
-            query = query.Where(t => t.IsPaused == paused);
+        if (filter.IsPaused is not null)
+            query = query.Where(t => t.IsPaused == filter.IsPaused.Value);
 
-        if (filter.FromDate is { } from)
-            query = query.Where(t => t.CreatedAt >= from);
+        if (filter.FromDate is not null)
+            query = query.Where(t => t.CreatedAt >= filter.FromDate.Value);
 
-        if (filter.ToDate is { } to)
-            query = query.Where(t => t.CreatedAt <= to);
+        if (filter.ToDate is not null)
+            query = query.Where(t => t.CreatedAt <= filter.ToDate.Value);
 
         var total = await query.CountAsync(ct);
         var items = await query

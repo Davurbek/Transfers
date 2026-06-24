@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Text;
@@ -9,23 +10,22 @@ using Universal.Transfers.Api.Messaging;
 using Universal.Transfers.Application;
 using Universal.Transfers.Application.Auth;
 using Universal.Transfers.Application.Messaging;
-using Microsoft.EntityFrameworkCore;
 using Universal.Transfers.Infrastructure;
 using Universal.Transfers.Infrastructure.Common.Persistence;
 using Universal.Transfers.Infrastructure.Messaging.Kafka;
 using Universal.Transfers.Infrastructure.Seeding;
-using Universal.Transfers.Infrastructure.Messaging.MassTransit;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
+builder.Services.Configure<KafkaOptions>(builder.Configuration.GetSection(KafkaOptions.SectionName));
 var jwt = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
-var connectionString = builder.Configuration.GetConnectionString("Dashboard") ?? "Server=.;Database=UniversalDocumentFlow;Integrated Security=True;MultipleActiveResultSets=true;Encrypt=False";
-var demoPassword = builder.Configuration.GetValue<string>("SeedData:DemoPassword") ?? "Passw0rd!";
+var connectionString = builder.Configuration.GetConnectionString("Dashboard") ?? throw new InvalidOperationException("ConnectionStrings:Dashboard is not configured.");
+var demoPassword = builder.Configuration.GetValue<string>("SeedData:DemoPassword") ?? throw new InvalidOperationException("SeedData:DemoPassword is not configured.");
 
 const string CorsPolicy = "dashboard-ui";
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
-                     ?? ["http://localhost:5173", "http://localhost:5290", "http://127.0.0.1:5173", "http://127.0.0.1:5290"];
+                     ?? throw new InvalidOperationException("AllowedOrigins is not configured.");
 
 builder.Services.AddInfrastructureServices(builder.Configuration);
 builder.Services.AddApplicationServices();
@@ -43,7 +43,12 @@ if (useKafka)
     builder.Services.AddKafkaMessaging(builder.Configuration);
 }
 
-if (useKafka || useMassTransit)
+if (useKafka)
+{
+    builder.Services.AddSingleton<ICommandPublisher, KafkaCommandPublisher>();
+}
+
+if (useMassTransit && !useKafka)
 {
     builder.Services.AddSingleton<ICommandPublisher, KafkaCommandPublisher>();
 }
@@ -112,7 +117,7 @@ builder.Services.AddRateLimiter(options =>
 
 builder.Services.AddCors(options =>
     options.AddPolicy(CorsPolicy, policy =>
-        policy.SetIsOriginAllowed(_ => true)
+        policy.WithOrigins(allowedOrigins)
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials()));
@@ -150,24 +155,6 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     await db.Database.EnsureCreatedAsync();
-    await db.Database.ExecuteSqlRawAsync(@"
-        IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'InboxMessages')
-        CREATE TABLE [dbo].[InboxMessages] (
-            [Id] BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
-            [IdempotencyKey] NVARCHAR(200) NOT NULL,
-            [EventType] NVARCHAR(500) NOT NULL,
-            [ProcessedAt] DATETIME2 NOT NULL,
-            CONSTRAINT [UQ_InboxMessages_IdempotencyKey] UNIQUE ([IdempotencyKey])
-        )");
-    await db.Database.ExecuteSqlRawAsync(@"
-        IF COL_LENGTH('dbo.Transactions', 'CreditGateway') IS NULL
-        ALTER TABLE [dbo].[Transactions] ADD [CreditGateway] NVARCHAR(32) NOT NULL DEFAULT 'Humo';
-        IF COL_LENGTH('dbo.Transactions', 'RemitterPartner') IS NULL
-        ALTER TABLE [dbo].[Transactions] ADD [RemitterPartner] NVARCHAR(32) NOT NULL DEFAULT '';
-        IF COL_LENGTH('dbo.CreditAttempts', 'EventId') IS NULL
-        ALTER TABLE [dbo].[CreditAttempts] ADD [EventId] NVARCHAR(200) NULL;
-        IF COL_LENGTH('dbo.PartnerRegistrations', 'EventId') IS NULL
-        ALTER TABLE [dbo].[PartnerRegistrations] ADD [EventId] NVARCHAR(200) NULL;");
     await DbSeeder.SeedAsync(db, demoPassword);
 }
 
@@ -179,9 +166,9 @@ if (app.Environment.IsDevelopment())
 
 app.UseRouting();
 app.UseCors(CorsPolicy);
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
-app.UseRateLimiter();
 
 app.MapControllers();
 app.MapGet("/health", () => Results.Ok(new { status = "ok" })).AllowAnonymous();

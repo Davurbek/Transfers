@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
-using Universal.Transfers.Domain.Auth.Entities;
 using Universal.Transfers.Domain.Audit.Entities;
+using Universal.Transfers.Domain.Auth.Entities;
 using Universal.Transfers.Domain.Inbox.Entities;
 using Universal.Transfers.Domain.Transactions.Entities;
 
@@ -128,6 +128,6 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.ActionType).HasMaxLength(64).IsRequired();
         });
 
-        b.ApplyConfiguration(new Universal.Transfers.Infrastructure.Inbox.Persistence.Configurations.ProcessedMessageConfiguration());
+        b.ApplyConfiguration(new Inbox.Persistence.Configurations.ProcessedMessageConfiguration());
     }
 }

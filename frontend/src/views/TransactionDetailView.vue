@@ -216,6 +216,7 @@ onUnmounted(stopPolling)
   display: inline-block;
   font-size: 13px;
   margin-bottom: 16px;
+  font-weight: 500;
 }
 
 .detail-header {
@@ -232,25 +233,28 @@ onUnmounted(stopPolling)
   gap: 12px;
 }
 .detail-title h1 {
-  font-size: 22px;
+  font-size: 24px;
   margin: 0;
+  font-weight: 800;
+  letter-spacing: -0.02em;
 }
 .detail-actions {
   display: flex;
   gap: 8px;
 }
 .action-msg {
-  margin-bottom: 16px;
-  padding: 10px 14px;
+  margin-bottom: 20px;
+  padding: 12px 16px;
   background: var(--success-bg);
   color: var(--success);
+  border: 1px solid rgba(52, 211, 153, 0.2);
   border-radius: var(--radius-sm);
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .info-card {
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 .info-grid {
   display: grid;
@@ -265,7 +269,7 @@ onUnmounted(stopPolling)
 .info-label {
   font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
   color: var(--text-muted);
   font-weight: 600;
 }
@@ -280,15 +284,15 @@ onUnmounted(stopPolling)
 }
 
 .section-card {
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 .section-card h2 {
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
   margin: 0 0 16px;
   color: var(--text-dim);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
 }
 .table-wrap {
   overflow-x: auto;
@@ -341,11 +345,13 @@ onUnmounted(stopPolling)
   border-radius: 50%;
   background: var(--surface-3);
   border: 2px solid var(--border);
+  transition: all var(--transition);
 }
 .dot.first {
   background: var(--primary);
   border-color: var(--primary);
   box-shadow: 0 0 0 4px var(--primary-glow);
+  animation: glow-pulse 2s ease-in-out infinite;
 }
 .timeline-content {
   display: flex;
@@ -366,5 +372,9 @@ onUnmounted(stopPolling)
 .timeline-time {
   font-size: 11px;
   color: var(--text-muted);
+}
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 8px var(--primary-glow); }
+  50% { box-shadow: 0 0 20px var(--primary-glow); }
 }
 </style>

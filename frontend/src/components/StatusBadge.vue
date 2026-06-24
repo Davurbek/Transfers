@@ -19,30 +19,34 @@ const tone = computed(() => {
 <style scoped>
 .badge {
   display: inline-block;
-  padding: 3px 10px;
+  padding: 3px 11px;
   border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: 700;
   border: 1px solid transparent;
+  letter-spacing: 0.01em;
 }
 .success {
-  background: rgba(34, 197, 94, 0.15);
-  color: #4ade80;
-  border-color: rgba(34, 197, 94, 0.4);
+  background: var(--success-bg);
+  color: var(--success);
+  border-color: rgba(52, 211, 153, 0.35);
+  box-shadow: 0 0 8px rgba(52, 211, 153, 0.1);
 }
 .danger {
-  background: rgba(239, 68, 68, 0.15);
-  color: #f87171;
-  border-color: rgba(239, 68, 68, 0.4);
+  background: var(--danger-bg);
+  color: var(--danger);
+  border-color: rgba(248, 113, 113, 0.35);
+  box-shadow: 0 0 8px rgba(248, 113, 113, 0.1);
 }
 .warning {
-  background: rgba(245, 158, 11, 0.15);
-  color: #fbbf24;
-  border-color: rgba(245, 158, 11, 0.4);
+  background: var(--warning-bg);
+  color: var(--warning);
+  border-color: rgba(251, 191, 36, 0.35);
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.1);
 }
 .neutral {
-  background: rgba(148, 163, 184, 0.15);
-  color: #cbd5e1;
-  border-color: rgba(148, 163, 184, 0.35);
+  background: rgba(148, 163, 184, 0.1);
+  color: #b0c8e8;
+  border-color: rgba(148, 163, 184, 0.25);
 }
 </style>

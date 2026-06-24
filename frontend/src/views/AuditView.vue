@@ -100,9 +100,10 @@ onMounted(load)
   margin-bottom: 20px;
 }
 .page-header h1 {
-  font-size: 24px;
-  font-weight: 700;
+  font-size: 26px;
+  font-weight: 800;
   margin: 0 0 4px;
+  letter-spacing: -0.03em;
 }
 .page-header p {
   font-size: 13px;
@@ -125,17 +126,19 @@ onMounted(load)
 }
 .action-tag {
   font-family: ui-monospace, 'SF Mono', Menlo, monospace;
-  font-size: 12px;
-  background: var(--surface-3);
-  padding: 3px 8px;
-  border-radius: 4px;
-  color: var(--primary);
-  font-weight: 500;
+  font-size: 11px;
+  background: var(--primary-subtle);
+  padding: 3px 10px;
+  border-radius: 100px;
+  color: var(--primary-hover);
+  font-weight: 600;
+  border: 1px solid rgba(91, 156, 255, 0.2);
 }
 .empty-state {
   text-align: center;
   color: var(--text-dim);
   padding: 40px 16px !important;
+  font-weight: 500;
 }
 .error-state {
   padding: 40px 24px;

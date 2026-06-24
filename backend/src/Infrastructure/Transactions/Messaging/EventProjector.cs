@@ -58,7 +58,7 @@ public class EventProjector(
             IsPaused = e.IsPaused,
             CreatedAt = e.CreatedAt,
             UpdatedAt = e.UpdatedAt,
-            CreditGateway = e.CreditGateway ?? Domain.Transactions.Enums.CreditGateway.Humo,
+            CreditGateway = e.CreditGateway ?? CreditGateway.Humo,
             RemitterPartner = e.RemitterPartner ?? string.Empty,
         };
 

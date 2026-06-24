@@ -18,16 +18,23 @@ const router = useRouter()
   min-height: 70vh;
   display: grid;
   place-items: center;
+  padding: 40px;
 }
 .card {
   text-align: center;
   max-width: 420px;
+  padding: 48px 36px;
 }
 h1 {
-  font-size: 20px;
+  font-size: 22px;
   margin: 0 0 8px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+p {
+  font-size: 14px;
 }
 button {
-  margin-top: 16px;
+  margin-top: 20px;
 }
 </style>

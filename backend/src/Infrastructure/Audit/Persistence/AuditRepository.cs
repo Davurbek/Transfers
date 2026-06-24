@@ -21,11 +21,11 @@ public sealed class AuditRepository(AppDbContext db) : IAuditRepository
         if (!string.IsNullOrWhiteSpace(filter.Username))
             query = query.Where(a => a.Username == filter.Username);
 
-        if (filter.FromDate is { } from)
-            query = query.Where(a => a.Timestamp >= from);
+        if (filter.FromDate is not null)
+            query = query.Where(a => a.Timestamp >= filter.FromDate.Value);
 
-        if (filter.ToDate is { } to)
-            query = query.Where(a => a.Timestamp <= to);
+        if (filter.ToDate is not null)
+            query = query.Where(a => a.Timestamp <= filter.ToDate.Value);
 
         var total = await query.CountAsync(ct);
         var items = await query
