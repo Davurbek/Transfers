@@ -59,7 +59,7 @@ public static class DbSeeder
 
         Grant(supportRole, Permissions.TxRead);
         Grant(opsRole, Permissions.TxRead, Permissions.TxUnpause);
-        Grant(complianceRole, Permissions.TxRead, Permissions.TxUnpause, Permissions.TxCancel, Permissions.AuditRead);
+        Grant(complianceRole, Permissions.TxRead, Permissions.TxUnpause, Permissions.TxCancel, Permissions.AuditRead, Permissions.Admin);
 
         var support = NewUser("support", "support@transfers.local", demoPassword);
         var ops = NewUser("ops", "ops@transfers.local", demoPassword);

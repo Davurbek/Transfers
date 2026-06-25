@@ -10,6 +10,9 @@ const router = useRouter()
 const navItems = computed(() => [
   { label: 'Transactions', to: '/', icon: '≡', permission: Permission.TxRead },
   { label: 'Audit log', to: '/audit', icon: '◎', permission: Permission.AuditRead },
+  { label: 'Users', to: '/admin/users', icon: '👤', permission: Permission.Admin },
+  { label: 'Roles', to: '/admin/roles', icon: '⚙', permission: Permission.Admin },
+  { label: 'Permissions', to: '/admin/permissions', icon: '🔑', permission: Permission.Admin },
 ].filter(item => !item.permission || auth.hasPermission(item.permission)))
 
 async function handleLogout() {

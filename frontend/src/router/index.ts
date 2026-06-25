@@ -28,6 +28,39 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/AuditView.vue'),
     meta: { permission: Permission.AuditRead },
   },
+  // Admin routes
+  {
+    path: '/admin/users',
+    name: 'users',
+    component: () => import('@/views/UsersView.vue'),
+    meta: { permission: Permission.Admin },
+  },
+  {
+    path: '/admin/users/:id',
+    name: 'user-detail',
+    component: () => import('@/views/UserDetailView.vue'),
+    props: true,
+    meta: { permission: Permission.Admin },
+  },
+  {
+    path: '/admin/roles',
+    name: 'roles',
+    component: () => import('@/views/RolesView.vue'),
+    meta: { permission: Permission.Admin },
+  },
+  {
+    path: '/admin/roles/:id',
+    name: 'role-detail',
+    component: () => import('@/views/RoleDetailView.vue'),
+    props: true,
+    meta: { permission: Permission.Admin },
+  },
+  {
+    path: '/admin/permissions',
+    name: 'permissions',
+    component: () => import('@/views/PermissionsView.vue'),
+    meta: { permission: Permission.Admin },
+  },
   {
     path: '/forbidden',
     name: 'forbidden',

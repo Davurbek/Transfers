@@ -4,6 +4,7 @@ export const Permission = {
   TxUnpause: 'tx:unpause',
   TxCancel: 'tx:cancel',
   AuditRead: 'audit:read',
+  Admin: 'admin',
 } as const
 
 export type PermissionCode = (typeof Permission)[keyof typeof Permission]

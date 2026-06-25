@@ -65,24 +65,6 @@ async function submit() {
           <span>{{ loading ? 'Signing in…' : 'Sign in' }}</span>
         </button>
       </div>
-
-      <div class="login-footer">
-        <p class="muted">Demo accounts (password <code>Passw0rd!</code>)</p>
-        <div class="accounts">
-          <div class="account-row">
-            <span class="account-role">support</span>
-            <span class="account-desc">— read only</span>
-          </div>
-          <div class="account-row">
-            <span class="account-role">ops</span>
-            <span class="account-desc">— read + unpause</span>
-          </div>
-          <div class="account-row">
-            <span class="account-role">compliance</span>
-            <span class="account-desc">— read + unpause + audit</span>
-          </div>
-        </div>
-      </div>
     </form>
   </div>
 </template>

@@ -6,6 +6,7 @@ public static class Permissions
     public const string TxUnpause = "tx:unpause";
     public const string TxCancel = "tx:cancel";
     public const string AuditRead = "audit:read";
+    public const string Admin = "admin";
 
     public static readonly IReadOnlyDictionary<string, string> All = new Dictionary<string, string>
     {
@@ -13,5 +14,6 @@ public static class Permissions
         [TxUnpause] = "Release a paused transaction (write action)",
         [TxCancel] = "Cancel a transaction (write action)",
         [AuditRead] = "Read the audit log",
+        [Admin] = "Manage users, roles, and permissions",
     };
 }

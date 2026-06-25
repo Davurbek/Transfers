@@ -89,3 +89,63 @@ export interface ActionAcceptedResponse {
   transactionId: string
   commandId: string
 }
+
+// Admin models
+export interface UserListItem {
+  id: string
+  username: string
+  email: string
+  isActive: boolean
+  createdAt: string
+  roles: string[]
+}
+
+export interface UserDetail {
+  id: string
+  username: string
+  email: string
+  isActive: boolean
+  createdAt: string
+  roles: RoleInfo[]
+}
+
+export interface UserCreate {
+  username: string
+  email: string
+  password: string
+}
+
+export interface RoleInfo {
+  id: string
+  name: string
+  description: string | null
+}
+
+export interface RoleListItem {
+  id: string
+  name: string
+  description: string | null
+}
+
+export interface RoleDetail {
+  id: string
+  name: string
+  description: string | null
+  permissions: PermissionInfo[]
+}
+
+export interface PermissionInfo {
+  id: string
+  code: string
+  description: string | null
+}
+
+export interface RoleCreate {
+  name: string
+  description?: string
+}
+
+export interface PermissionCreate {
+  code: string
+  description?: string
+}

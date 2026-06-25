@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Universal.Transfers.Application.Admin;
 using Universal.Transfers.Application.Auth;
 using Universal.Transfers.Application.Transactions;
 using Universal.Transfers.Application.Audit;
@@ -14,6 +15,7 @@ public static class DependencyInjection
         services.AddScoped<ITokenService, TokenService>();
         services.AddScoped<ITransactionService, TransactionService>();
         services.AddScoped<IAuditService, AuditService>();
+        services.AddScoped<IAdminService, AdminService>();
 
         return services;
     }
