@@ -165,7 +165,7 @@ public class EventProjector(
             var attemptEventId = $"{tx.InternalRef}-ca-{e.AttemptNumber}";
             if (!await txRepo.CreditAttemptExistsAsync(attemptEventId, ct))
             {
-                tx.CreditAttempts.Add(new CreditAttempt
+                txRepo.AddCreditAttempt(new CreditAttempt
                 {
                     TransactionId = tx.Id,
                     AttemptNumber = e.AttemptNumber.Value,
@@ -188,7 +188,7 @@ public class EventProjector(
             var regEventId = $"{tx.InternalRef}-pr-{e.AttemptNumber}";
             if (!await txRepo.PartnerRegistrationExistsAsync(regEventId, ct))
             {
-                tx.PartnerRegistrations.Add(new PartnerRegistration
+                txRepo.AddPartnerRegistration(new PartnerRegistration
                 {
                     TransactionId = tx.Id,
                     PartnerName = partnerName,

@@ -15,7 +15,4 @@ public enum TransactionStatus
     RegistrationFailedRetry = 8,
     RegistrationSucceeded = 10,
     Paused = 11,
-    CreditPending = 12,
-    RegistrationPending = 13,
-    Cancelled = 14,
 }

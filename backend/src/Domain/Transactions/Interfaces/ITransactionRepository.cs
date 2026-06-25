@@ -12,6 +12,8 @@ public interface ITransactionRepository
     Task<Transaction?> GetDetailAsync(string transactionId, CancellationToken ct = default);
     Task AddAsync(Transaction transaction, CancellationToken ct = default);
     void AddStatusHistory(TransactionStatusHistory history);
+    void AddCreditAttempt(CreditAttempt attempt);
+    void AddPartnerRegistration(PartnerRegistration registration);
     Task<bool> StatusEventExistsAsync(string eventId, CancellationToken ct = default);
     Task<bool> CreditAttemptExistsAsync(string eventId, CancellationToken ct = default);
     Task<bool> PartnerRegistrationExistsAsync(string eventId, CancellationToken ct = default);

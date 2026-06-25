@@ -6,7 +6,7 @@ const props = defineProps<{ status: string }>()
 const tone = computed(() => {
   const s = props.status
   if (s.endsWith('Succeeded')) return 'success'
-  if (s.endsWith('Failed') || s === 'Cancelled') return 'danger'
+  if (s.endsWith('Failed')) return 'danger'
   if (s === 'Paused' || s.endsWith('FailedRetry')) return 'warning'
   return 'neutral'
 })

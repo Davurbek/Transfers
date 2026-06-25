@@ -12,9 +12,8 @@ const { items, total, loading, error, filters, load, applyFilters, setPage, setP
 
 const statuses = [
   'ConfirmPending', 'ConfirmExpired', 'ConfirmFailed', 'ConfirmSucceeded',
-  'CreditPending', 'CreditSucceeded', 'CreditFailedRetry', 'CreditFailed',
-  'RegistrationPending', 'RegistrationFailedRetry', 'RegistrationSucceeded',
-  'Paused', 'Cancelled',
+  'CreditSucceeded', 'CreditFailedRetry', 'CreditFailed',
+  'RegistrationFailedRetry', 'RegistrationSucceeded', 'Paused',
 ]
 
 function openDetail(tx: TransactionSummary) {

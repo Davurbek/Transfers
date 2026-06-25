@@ -63,6 +63,12 @@ public sealed class TransactionRepository(AppDbContext db) : ITransactionReposit
     public void AddStatusHistory(TransactionStatusHistory history) =>
         db.TransactionStatusHistory.Add(history);
 
+    public void AddCreditAttempt(CreditAttempt attempt) =>
+        db.CreditAttempts.Add(attempt);
+
+    public void AddPartnerRegistration(PartnerRegistration registration) =>
+        db.PartnerRegistrations.Add(registration);
+
     public Task<bool> StatusEventExistsAsync(string eventId, CancellationToken ct = default) =>
         db.TransactionStatusHistory.AnyAsync(h => h.EventId == eventId, ct);
 

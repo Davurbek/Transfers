@@ -1,7 +1,9 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using System.Threading.Channels;
 using Universal.Transfers.Application.Messaging;
 using Universal.Transfers.Domain.Transactions.Enums;
+using Universal.Transfers.Domain.Transactions.Interfaces;
 
 namespace Universal.Transfers.Api.Messaging;
 
@@ -51,23 +53,46 @@ public sealed class SimulatedBroker(
         {
             case UnpauseTransactionCommand unpause:
                 var txRef = unpause.TransactionId;
+
+                TransactionStatus resumeTo;
+                using (var scope = services.CreateScope())
+                {
+                    var repo = scope.ServiceProvider.GetRequiredService<ITransactionRepository>();
+                    var tx = await repo.GetDetailAsync(txRef, ct);
+                    var lastBeforePause = tx?.StatusHistory
+                        .Where(h => h.ToStatus == TransactionStatus.Paused)
+                        .MaxBy(h => h.OccurredAt)?.FromStatus;
+                    resumeTo = lastBeforePause switch
+                    {
+                        TransactionStatus.CreditFailedRetry => TransactionStatus.CreditFailedRetry,
+                        _ => TransactionStatus.RegistrationFailedRetry,
+                    };
+                }
+
                 await EmitAsync(new TransactionStatusChanged
                 {
                     TransactionId = txRef,
                     FromStatus = TransactionStatus.Paused,
-                    ToStatus = TransactionStatus.RegistrationFailedRetry,
-                    Reason = $"Unpaused by {unpause.IssuedByUser}; retrying partner registration",
+                    ToStatus = resumeTo,
+                    Reason = $"Unpaused by {unpause.IssuedByUser}; resuming from {resumeTo}",
                     IsPaused = false,
                 }, ct);
 
                 await Task.Delay(_delayMs, ct);
 
+                var finalStatus = resumeTo == TransactionStatus.CreditFailedRetry
+                    ? TransactionStatus.CreditSucceeded
+                    : TransactionStatus.RegistrationSucceeded;
+                var finalReason = resumeTo == TransactionStatus.CreditFailedRetry
+                    ? "Credit succeeded after manual unpause"
+                    : "Partner registration succeeded after manual unpause";
+
                 await EmitAsync(new TransactionStatusChanged
                 {
                     TransactionId = txRef,
-                    FromStatus = TransactionStatus.RegistrationFailedRetry,
-                    ToStatus = TransactionStatus.RegistrationSucceeded,
-                    Reason = "Partner registration succeeded after manual unpause",
+                    FromStatus = resumeTo,
+                    ToStatus = finalStatus,
+                    Reason = finalReason,
                     IsPaused = false,
                 }, ct);
                 break;
