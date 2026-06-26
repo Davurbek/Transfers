@@ -16,7 +16,7 @@ public static class EventRouter
             RecipientName = e.ReceiverCardLast4,
             Amount = e.CreditAmount,
             Currency = e.CreditAmountCurrency,
-            Corridor = e.RemitterPartner.ToString(),
+            Corridor = MapCorridor((ApiV2.RemitterPartner)e.RemitterPartner),
             CurrentStatus = ConfirmSucceeded,
             IsPaused = false,
             CreatedAt = e.OccurredOn,
@@ -108,6 +108,16 @@ public static class EventRouter
         ApiV2.TransactionStatus.RegistrationSucceeded => RegistrationSucceeded,
         ApiV2.TransactionStatus.Paused => Paused,
         _ => Paused,
+    };
+
+    private static string MapCorridor(ApiV2.RemitterPartner partner) => partner switch
+    {
+        ApiV2.RemitterPartner.Tinkoff => "RU->UZ",
+        ApiV2.RemitterPartner.Profee => "RU->UZ",
+        ApiV2.RemitterPartner.Gazprom => "RU->UZ",
+        ApiV2.RemitterPartner.Unlimited => "US->UZ",
+        ApiV2.RemitterPartner.MoneyGram => "US->UZ",
+        _ => "XX->UZ",
     };
 
     // ── ApiV2 event types consumed from Kafka ──────────────────────────────

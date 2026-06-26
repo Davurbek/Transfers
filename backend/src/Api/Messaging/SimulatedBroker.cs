@@ -1,4 +1,3 @@
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using System.Threading.Channels;
 using Universal.Transfers.Application.Messaging;

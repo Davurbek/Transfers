@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Universal.Transfers.Api.Auth;
 using Universal.Transfers.Application.Transactions;
 using Universal.Transfers.Application.Transactions.DTOs;
@@ -39,6 +40,7 @@ public class TransactionsController(ITransactionService transactionService) : Co
 
     [Authorize(Policy = "permission:tx:unpause")]
     [HttpPost("{id}/unpause")]
+    [EnableRateLimiting("mutations")]
     public async Task<IActionResult> Unpause(string id, CancellationToken ct)
     {
         var userId = HttpContext.User.GetUserId();

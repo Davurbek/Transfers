@@ -12,7 +12,6 @@ public static class DbSeeder
 {
     public static async Task SeedAsync(AppDbContext db, string demoPassword)
     {
-        await db.Database.EnsureCreatedAsync();
         await MigrateSchemaAsync(db);
 
         if (!await db.Permissions.AnyAsync())

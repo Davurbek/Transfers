@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Universal.Transfers.Application.Auth;
 using Universal.Transfers.Application.Auth.DTOs;
 
@@ -7,6 +8,7 @@ namespace Universal.Transfers.Api.Auth;
 
 [ApiController]
 [Route("auth")]
+[EnableRateLimiting("auth")]
 public class AuthController(IAuthService authService) : ControllerBase
 {
     [AllowAnonymous]

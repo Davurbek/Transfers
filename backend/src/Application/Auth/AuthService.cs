@@ -20,25 +20,7 @@ public class AuthService(
         if (user is null || !user.IsActive || !PasswordHasher.Verify(password, user.PasswordHash))
             return new LoginServiceResult(false, null, null, "Invalid credentials");
 
-        var permissions = (await permissionService.GetUserPermissionsAsync(user.Id, ct)).ToList();
-        var roles = (await permissionService.GetUserRolesAsync(user.Id, ct)).ToList();
-
-        var accessToken = tokenService.GenerateAccessToken(user, permissions, roles);
-        var rawRefresh = tokenService.GenerateRefreshToken();
-        var refreshTokenHash = tokenService.HashToken(rawRefresh);
-
-        await refreshTokenRepo.AddAsync(new Domain.Auth.Entities.RefreshToken
-        {
-            UserId = user.Id,
-            TokenHash = refreshTokenHash,
-            ExpiresAt = DateTimeOffset.UtcNow.AddDays(7),
-            CreatedByIp = ipAddress,
-        }, ct);
-        await refreshTokenRepo.SaveChangesAsync(ct);
-
-        var expiresAt = DateTime.UtcNow.AddMinutes(_jwt.AccessTokenMinutes);
-        var userInfo = new UserInfoResponse(user.Id, user.Username, user.Email, permissions, roles);
-        return new LoginServiceResult(true, new LoginResponse(accessToken, expiresAt, userInfo), rawRefresh, null);
+        return await GenerateTokensAsync(user, ipAddress, ct);
     }
 
     public async Task<LoginServiceResult> RefreshTokenAsync(string refreshToken, string? ipAddress, CancellationToken ct = default)
@@ -51,26 +33,7 @@ public class AuthService(
         stored.RevokedAt = DateTimeOffset.UtcNow;
         await refreshTokenRepo.SaveChangesAsync(ct);
 
-        var user = stored.User;
-        var permissions = (await permissionService.GetUserPermissionsAsync(user.Id, ct)).ToList();
-        var roles = (await permissionService.GetUserRolesAsync(user.Id, ct)).ToList();
-
-        var accessToken = tokenService.GenerateAccessToken(user, permissions, roles);
-        var rawRefresh = tokenService.GenerateRefreshToken();
-        var refreshTokenHash = tokenService.HashToken(rawRefresh);
-
-        await refreshTokenRepo.AddAsync(new Domain.Auth.Entities.RefreshToken
-        {
-            UserId = user.Id,
-            TokenHash = refreshTokenHash,
-            ExpiresAt = DateTimeOffset.UtcNow.AddDays(7),
-            CreatedByIp = ipAddress,
-        }, ct);
-        await refreshTokenRepo.SaveChangesAsync(ct);
-
-        var expiresAt = DateTime.UtcNow.AddMinutes(_jwt.AccessTokenMinutes);
-        var userInfo = new UserInfoResponse(user.Id, user.Username, user.Email, permissions, roles);
-        return new LoginServiceResult(true, new LoginResponse(accessToken, expiresAt, userInfo), rawRefresh, null);
+        return await GenerateTokensAsync(stored.User, ipAddress, ct);
     }
 
     public async Task LogoutAsync(string refreshToken, CancellationToken ct = default)
@@ -92,5 +55,28 @@ public class AuthService(
         var permissions = await permissionService.GetUserPermissionsAsync(userId, ct);
         var roles = await permissionService.GetUserRolesAsync(userId, ct);
         return new UserInfoResponse(user.Id, user.Username, user.Email, permissions, roles);
+    }
+
+    private async Task<LoginServiceResult> GenerateTokensAsync(Domain.Auth.Entities.User user, string? ipAddress, CancellationToken ct)
+    {
+        var permissions = (await permissionService.GetUserPermissionsAsync(user.Id, ct)).ToList();
+        var roles = (await permissionService.GetUserRolesAsync(user.Id, ct)).ToList();
+
+        var accessToken = tokenService.GenerateAccessToken(user, permissions, roles);
+        var rawRefresh = tokenService.GenerateRefreshToken();
+        var refreshTokenHash = tokenService.HashToken(rawRefresh);
+
+        await refreshTokenRepo.AddAsync(new Domain.Auth.Entities.RefreshToken
+        {
+            UserId = user.Id,
+            TokenHash = refreshTokenHash,
+            ExpiresAt = DateTimeOffset.UtcNow.AddDays(7),
+            CreatedByIp = ipAddress,
+        }, ct);
+        await refreshTokenRepo.SaveChangesAsync(ct);
+
+        var expiresAt = DateTime.UtcNow.AddMinutes(_jwt.AccessTokenMinutes);
+        var userInfo = new UserInfoResponse(user.Id, user.Username, user.Email, permissions, roles);
+        return new LoginServiceResult(true, new LoginResponse(accessToken, expiresAt, userInfo), rawRefresh, null);
     }
 }

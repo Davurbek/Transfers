@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Universal.Transfers.Application.Admin;
 using Universal.Transfers.Application.Admin.DTOs;
 
@@ -27,6 +28,7 @@ public class AdminController(IAdminService adminService) : ControllerBase
 
     [Authorize(Policy = "permission:admin")]
     [HttpPost("users")]
+    [EnableRateLimiting("mutations")]
     public async Task<IActionResult> CreateUser([FromBody] UserCreateRequest request, CancellationToken ct)
     {
         try
@@ -39,6 +41,7 @@ public class AdminController(IAdminService adminService) : ControllerBase
 
     [Authorize(Policy = "permission:admin")]
     [HttpPut("users/{id:guid}")]
+    [EnableRateLimiting("mutations")]
     public async Task<IActionResult> UpdateUser(Guid id, [FromBody] UserUpdateRequest request, CancellationToken ct)
     {
         try
@@ -51,6 +54,7 @@ public class AdminController(IAdminService adminService) : ControllerBase
 
     [Authorize(Policy = "permission:admin")]
     [HttpDelete("users/{id:guid}")]
+    [EnableRateLimiting("mutations")]
     public async Task<IActionResult> DeleteUser(Guid id, CancellationToken ct)
     {
         try
@@ -63,14 +67,20 @@ public class AdminController(IAdminService adminService) : ControllerBase
 
     [Authorize(Policy = "permission:admin")]
     [HttpPost("users/{userId:guid}/roles")]
+    [EnableRateLimiting("mutations")]
     public async Task<IActionResult> AddUserRole(Guid userId, [FromBody] UserRoleRequest request, CancellationToken ct)
     {
-        await adminService.AddUserRoleAsync(userId, request.RoleId, ct);
-        return NoContent();
+        try
+        {
+            await adminService.AddUserRoleAsync(userId, request.RoleId, ct);
+            return NoContent();
+        }
+        catch (InvalidOperationException ex) { return NotFound(new { message = ex.Message }); }
     }
 
     [Authorize(Policy = "permission:admin")]
     [HttpDelete("users/{userId:guid}/roles/{roleId:guid}")]
+    [EnableRateLimiting("mutations")]
     public async Task<IActionResult> RemoveUserRole(Guid userId, Guid roleId, CancellationToken ct)
     {
         await adminService.RemoveUserRoleAsync(userId, roleId, ct);
@@ -94,6 +104,7 @@ public class AdminController(IAdminService adminService) : ControllerBase
 
     [Authorize(Policy = "permission:admin")]
     [HttpPost("roles")]
+    [EnableRateLimiting("mutations")]
     public async Task<IActionResult> CreateRole([FromBody] RoleCreateRequest request, CancellationToken ct)
     {
         try
@@ -106,6 +117,7 @@ public class AdminController(IAdminService adminService) : ControllerBase
 
     [Authorize(Policy = "permission:admin")]
     [HttpPut("roles/{id:guid}")]
+    [EnableRateLimiting("mutations")]
     public async Task<IActionResult> UpdateRole(Guid id, [FromBody] RoleUpdateRequest request, CancellationToken ct)
     {
         try
@@ -118,6 +130,7 @@ public class AdminController(IAdminService adminService) : ControllerBase
 
     [Authorize(Policy = "permission:admin")]
     [HttpDelete("roles/{id:guid}")]
+    [EnableRateLimiting("mutations")]
     public async Task<IActionResult> DeleteRole(Guid id, CancellationToken ct)
     {
         try
@@ -125,19 +138,25 @@ public class AdminController(IAdminService adminService) : ControllerBase
             await adminService.DeleteRoleAsync(id, ct);
             return NoContent();
         }
-        catch (Exception ex) { return NotFound(new { message = ex.Message }); }
+        catch (InvalidOperationException ex) { return NotFound(new { message = ex.Message }); }
     }
 
     [Authorize(Policy = "permission:admin")]
     [HttpPost("roles/{roleId:guid}/permissions")]
+    [EnableRateLimiting("mutations")]
     public async Task<IActionResult> AddRolePermission(Guid roleId, [FromBody] RolePermissionRequest request, CancellationToken ct)
     {
-        await adminService.AddRolePermissionAsync(roleId, request.PermissionId, ct);
-        return NoContent();
+        try
+        {
+            await adminService.AddRolePermissionAsync(roleId, request.PermissionId, ct);
+            return NoContent();
+        }
+        catch (InvalidOperationException ex) { return NotFound(new { message = ex.Message }); }
     }
 
     [Authorize(Policy = "permission:admin")]
     [HttpDelete("roles/{roleId:guid}/permissions/{permissionId:guid}")]
+    [EnableRateLimiting("mutations")]
     public async Task<IActionResult> RemoveRolePermission(Guid roleId, Guid permissionId, CancellationToken ct)
     {
         await adminService.RemoveRolePermissionAsync(roleId, permissionId, ct);
@@ -161,6 +180,7 @@ public class AdminController(IAdminService adminService) : ControllerBase
 
     [Authorize(Policy = "permission:admin")]
     [HttpPost("permissions")]
+    [EnableRateLimiting("mutations")]
     public async Task<IActionResult> CreatePermission([FromBody] PermissionCreateRequest request, CancellationToken ct)
     {
         try
@@ -173,6 +193,7 @@ public class AdminController(IAdminService adminService) : ControllerBase
 
     [Authorize(Policy = "permission:admin")]
     [HttpPut("permissions/{id:guid}")]
+    [EnableRateLimiting("mutations")]
     public async Task<IActionResult> UpdatePermission(Guid id, [FromBody] PermissionUpdateRequest request, CancellationToken ct)
     {
         try
@@ -185,6 +206,7 @@ public class AdminController(IAdminService adminService) : ControllerBase
 
     [Authorize(Policy = "permission:admin")]
     [HttpDelete("permissions/{id:guid}")]
+    [EnableRateLimiting("mutations")]
     public async Task<IActionResult> DeletePermission(Guid id, CancellationToken ct)
     {
         try
@@ -192,6 +214,6 @@ public class AdminController(IAdminService adminService) : ControllerBase
             await adminService.DeletePermissionAsync(id, ct);
             return NoContent();
         }
-        catch (Exception ex) { return NotFound(new { message = ex.Message }); }
+        catch (InvalidOperationException ex) { return NotFound(new { message = ex.Message }); }
     }
 }

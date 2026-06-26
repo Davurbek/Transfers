@@ -14,21 +14,12 @@ export default defineConfig({
     port: 5173,
     proxy: {
       // Proxy API calls to the .NET backend during development.
-      '/auth': {
+      // The httpClient uses /api prefix; rewrite strips it since backend routes
+      // are at /auth, /transactions, /audit, /admin (no /api prefix).
+      '/api': {
         target: 'http://localhost:5290',
         changeOrigin: true,
-      },
-      '/transactions': {
-        target: 'http://localhost:5290',
-        changeOrigin: true,
-      },
-      '/audit': {
-        target: 'http://localhost:5290',
-        changeOrigin: true,
-      },
-      '/admin': {
-        target: 'http://localhost:5290',
-        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ''),
       },
     },
   },

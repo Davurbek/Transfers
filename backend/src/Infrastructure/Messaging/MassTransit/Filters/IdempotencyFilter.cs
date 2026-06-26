@@ -41,8 +41,8 @@ public sealed class IdempotencyFilter<TMessage>(
     private static string ReadIdempotencyKey(ConsumeContext context)
     {
         var key = context.Headers.Get<string>(IdempotencyHeader);
-        if (string.IsNullOrWhiteSpace(key))
-            throw new InvalidOperationException($"Required Kafka header '{IdempotencyHeader}' is missing.");
-        return key;
+        if (!string.IsNullOrWhiteSpace(key))
+            return key;
+        return context.MessageId?.ToString("N") ?? Guid.NewGuid().ToString("N");
     }
 }

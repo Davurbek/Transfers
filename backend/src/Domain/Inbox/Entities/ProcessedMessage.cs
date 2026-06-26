@@ -2,10 +2,10 @@ namespace Universal.Transfers.Domain.Inbox.Entities;
 
 public sealed class ProcessedMessage
 {
-    public long Id { get; init; }
-    public string IdempotencyKey { get; init; } = string.Empty;
-    public string EventType { get; init; } = string.Empty;
-    public DateTime ProcessedAt { get; init; }
+    public long Id { get; set; }
+    public string IdempotencyKey { get; set; } = string.Empty;
+    public string EventType { get; set; } = string.Empty;
+    public DateTime ProcessedAt { get; set; }
 
     public static ProcessedMessage Create(string idempotencyKey, string eventType, DateTime processedAt)
     {

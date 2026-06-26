@@ -6,6 +6,7 @@ using Microsoft.OpenApi.Models;
 using System.Text;
 using System.Threading.RateLimiting;
 using Universal.Transfers.Api.Auth;
+using Universal.Transfers.Api.Common.Middlewares;
 using Universal.Transfers.Api.Messaging;
 using Universal.Transfers.Application;
 using Universal.Transfers.Application.Auth;
@@ -20,12 +21,14 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
 builder.Services.Configure<KafkaOptions>(builder.Configuration.GetSection(KafkaOptions.SectionName));
 var jwt = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
-var connectionString = builder.Configuration.GetConnectionString("Dashboard") ?? throw new InvalidOperationException("ConnectionStrings:Dashboard is not configured.");
-var demoPassword = builder.Configuration.GetValue<string>("SeedData:DemoPassword") ?? throw new InvalidOperationException("SeedData:DemoPassword is not configured.");
+if (jwt.SigningKey.Length < 32)
+    throw new InvalidOperationException("JWT SigningKey must be at least 32 characters. Set Jwt:SigningKey via environment variable or user secrets.");
+var demoPassword = builder.Configuration.GetValue<string>("SeedData:DemoPassword")
+    ?? throw new InvalidOperationException("SeedData:DemoPassword is not configured. Set it via environment variable or user secrets.");
 
 const string CorsPolicy = "dashboard-ui";
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
-                     ?? throw new InvalidOperationException("AllowedOrigins is not configured.");
+                     ?? throw new InvalidOperationException("Cors:AllowedOrigins is not configured.");
 
 builder.Services.AddInfrastructureServices(builder.Configuration);
 builder.Services.AddApplicationServices();
@@ -43,12 +46,7 @@ if (useKafka)
     builder.Services.AddKafkaMessaging(builder.Configuration);
 }
 
-if (useKafka)
-{
-    builder.Services.AddSingleton<ICommandPublisher, KafkaCommandPublisher>();
-}
-
-if (useMassTransit && !useKafka)
+if (useKafka || useMassTransit)
 {
     builder.Services.AddSingleton<ICommandPublisher, KafkaCommandPublisher>();
 }
@@ -122,7 +120,10 @@ builder.Services.AddCors(options =>
               .AllowAnyMethod()
               .AllowCredentials()));
 
-builder.Services.AddControllers()
+builder.Services.AddControllers(options =>
+    {
+        options.Filters.Add<Universal.Transfers.Api.Common.Filters.ValidationFilter>();
+    })
     .AddJsonOptions(options =>
         options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));
 builder.Services.AddEndpointsApiExplorer();
@@ -151,6 +152,8 @@ builder.Services.AddSwaggerGen(c =>
 
 var app = builder.Build();
 
+app.UseMiddleware<ExceptionHandlingMiddleware>();
+
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -171,6 +174,19 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
-app.MapGet("/health", () => Results.Ok(new { status = "ok" })).AllowAnonymous();
+app.MapGet("/health", async (AppDbContext db) =>
+{
+    try
+    {
+        await db.Database.CanConnectAsync();
+        return Results.Ok(new { status = "healthy", database = "connected" });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(detail: ex.Message, statusCode: 503);
+    }
+}).AllowAnonymous();
+app.MapGet("/health/ready", () => Results.Ok(new { status = "ready" })).AllowAnonymous();
+app.MapGet("/health/live", () => Results.Ok(new { status = "alive" })).AllowAnonymous();
 
 app.Run();

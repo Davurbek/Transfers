@@ -35,7 +35,6 @@ public static class MassTransitMessagingConfiguration
 
         services.AddMassTransit(bus =>
         {
-            bus.UsingInMemory();
             bus.DisableUsageTelemetry();
 
             bus.AddRider(rider =>
