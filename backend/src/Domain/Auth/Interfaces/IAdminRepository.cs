@@ -31,6 +31,12 @@ public interface IAdminRepository
     Task RemoveUserRoleAsync(Guid userId, Guid roleId, CancellationToken ct = default);
     Task<bool> UserHasRoleAsync(Guid userId, Guid roleId, CancellationToken ct = default);
 
+    // User-Permission
+    Task<User?> GetUserWithPermissionsAsync(Guid id, CancellationToken ct = default);
+    Task AddUserPermissionAsync(UserPermission userPermission, CancellationToken ct = default);
+    Task RemoveUserPermissionAsync(Guid userId, Guid permissionId, CancellationToken ct = default);
+    Task<bool> UserHasPermissionAsync(Guid userId, Guid permissionId, CancellationToken ct = default);
+
     // Role-Permission
     Task AddRolePermissionAsync(RolePermission rolePermission, CancellationToken ct = default);
     Task RemoveRolePermissionAsync(Guid roleId, Guid permissionId, CancellationToken ct = default);

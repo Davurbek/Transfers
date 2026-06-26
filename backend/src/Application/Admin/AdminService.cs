@@ -18,7 +18,7 @@ public class AdminService(IAdminRepository repo) : IAdminService
 
     public async Task<UserDetailDto?> GetUserByIdAsync(Guid id, CancellationToken ct = default)
     {
-        var user = await repo.GetUserWithRolesAsync(id, ct);
+        var user = await repo.GetUserWithPermissionsAsync(id, ct);
         if (user is null) return null;
         return ToUserDetail(user);
     }
@@ -37,12 +37,24 @@ public class AdminService(IAdminRepository repo) : IAdminService
         };
         await repo.AddUserAsync(user, ct);
         await repo.SaveChangesAsync(ct);
-        return new UserDetailDto(user.Id, user.Username, user.Email, user.IsActive, user.CreatedAt, []);
+
+        if (request.RoleIds is { Count: > 0 })
+        {
+            foreach (var roleId in request.RoleIds)
+            {
+                if (!await repo.UserHasRoleAsync(user.Id, roleId, ct))
+                    await repo.AddUserRoleAsync(new UserRole { UserId = user.Id, RoleId = roleId }, ct);
+            }
+            await repo.SaveChangesAsync(ct);
+        }
+
+        var created = await repo.GetUserWithPermissionsAsync(user.Id, ct);
+        return ToUserDetail(created ?? user);
     }
 
     public async Task<UserDetailDto> UpdateUserAsync(Guid id, UserUpdateRequest request, CancellationToken ct = default)
     {
-        var user = await repo.GetUserWithRolesAsync(id, ct)
+        var user = await repo.GetUserWithPermissionsAsync(id, ct)
             ?? throw new InvalidOperationException("User not found");
 
         user.Username = request.Username;
@@ -71,6 +83,20 @@ public class AdminService(IAdminRepository repo) : IAdminService
     public async Task RemoveUserRoleAsync(Guid userId, Guid roleId, CancellationToken ct = default)
     {
         await repo.RemoveUserRoleAsync(userId, roleId, ct);
+        await repo.SaveChangesAsync(ct);
+    }
+
+    public async Task AddUserPermissionAsync(Guid userId, Guid permissionId, CancellationToken ct = default)
+    {
+        if (await repo.UserHasPermissionAsync(userId, permissionId, ct))
+            return;
+        await repo.AddUserPermissionAsync(new UserPermission { UserId = userId, PermissionId = permissionId }, ct);
+        await repo.SaveChangesAsync(ct);
+    }
+
+    public async Task RemoveUserPermissionAsync(Guid userId, Guid permissionId, CancellationToken ct = default)
+    {
+        await repo.RemoveUserPermissionAsync(userId, permissionId, ct);
         await repo.SaveChangesAsync(ct);
     }
 
@@ -171,5 +197,6 @@ public class AdminService(IAdminRepository repo) : IAdminService
 
     private static UserDetailDto ToUserDetail(User user) => new(
         user.Id, user.Username, user.Email, user.IsActive, user.CreatedAt,
-        user.UserRoles.Select(ur => new RoleDto(ur.Role.Id, ur.Role.Name, ur.Role.Description)).ToList());
+        user.UserRoles.Select(ur => new RoleDto(ur.Role.Id, ur.Role.Name, ur.Role.Description)).ToList(),
+        user.UserPermissions.Select(up => new PermissionDto(up.Permission.Id, up.Permission.Code, up.Permission.Description)).ToList());
 }

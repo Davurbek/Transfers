@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { adminService } from '@/di/container'
-import type { UserDetail, RoleListItem } from '@/domain/models'
+import type { UserDetail, RoleListItem, PermissionInfo } from '@/domain/models'
 
 const route = useRoute()
 const router = useRouter()
@@ -10,23 +10,27 @@ const userId = route.params.id as string
 
 const user = ref<UserDetail | null>(null)
 const allRoles = ref<RoleListItem[]>([])
+const allPermissions = ref<PermissionInfo[]>([])
 const loading = ref(true)
 const error = ref('')
 const editing = ref(false)
 const editForm = ref({ username: '', email: '', isActive: true })
 const saving = ref(false)
 const selectedRoleId = ref('')
+const selectedPermId = ref('')
 
 async function load() {
   loading.value = true
   error.value = ''
   try {
-    const [u, roles] = await Promise.all([
+    const [u, roles, perms] = await Promise.all([
       adminService.getUser(userId),
       adminService.getAllRoles(),
+      adminService.getAllPermissions(),
     ])
     user.value = u
     allRoles.value = roles
+    allPermissions.value = perms
     editForm.value = { username: u.username, email: u.email, isActive: u.isActive }
   } catch (e: any) {
     error.value = e?.response?.data?.message || e.message || 'User not found'
@@ -67,6 +71,26 @@ async function removeRole(roleId: string) {
   }
 }
 
+async function addDirectPerm() {
+  if (!selectedPermId.value) return
+  try {
+    await adminService.addUserPermission(userId, selectedPermId.value)
+    selectedPermId.value = ''
+    await load()
+  } catch (e: any) {
+    error.value = e?.response?.data?.message || e.message || 'Failed to add permission'
+  }
+}
+
+async function removeDirectPerm(permId: string) {
+  try {
+    await adminService.removeUserPermission(userId, permId)
+    await load()
+  } catch (e: any) {
+    error.value = e?.response?.data?.message || e.message || 'Failed to remove permission'
+  }
+}
+
 async function deleteUser() {
   if (!confirm('Deactivate this user?')) return
   try {
@@ -79,6 +103,10 @@ async function deleteUser() {
 
 const availableRoles = computed(() =>
   allRoles.value.filter(r => !user.value?.roles.some(ur => ur.id === r.id))
+)
+
+const availablePerms = computed(() =>
+  allPermissions.value.filter(p => !user.value?.permissions.some(up => up.id === p.id))
 )
 
 onMounted(load)
@@ -129,6 +157,25 @@ onMounted(load)
         </div>
       </div>
       <p v-else class="muted">No roles assigned.</p>
+    </div>
+
+    <div class="card">
+      <h3>Direct Permissions</h3>
+      <p class="muted" style="font-size:12px;margin-bottom:10px">Permissions assigned directly to this user (not inherited from roles).</p>
+      <div class="assign-row">
+        <select v-model="selectedPermId">
+          <option value="">Add permission…</option>
+          <option v-for="p in availablePerms" :key="p.id" :value="p.id">{{ p.code }}</option>
+        </select>
+        <button :disabled="!selectedPermId" @click="addDirectPerm">Add</button>
+      </div>
+      <div v-if="(user.permissions ?? []).length">
+        <div v-for="p in (user.permissions ?? [])" :key="p.id" class="assigned-item">
+          <div><strong>{{ p.code }}</strong><br /><span class="muted" style="font-size:12px">{{ p.description ?? '' }}</span></div>
+          <button class="secondary small" @click="removeDirectPerm(p.id)">✕</button>
+        </div>
+      </div>
+      <p v-else class="muted">No direct permissions assigned.</p>
     </div>
   </div>
   <div class="container" v-else-if="loading"><p>Loading…</p></div>

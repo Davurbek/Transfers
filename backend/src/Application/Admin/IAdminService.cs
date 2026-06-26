@@ -12,6 +12,8 @@ public interface IAdminService
     Task DeleteUserAsync(Guid id, CancellationToken ct = default);
     Task AddUserRoleAsync(Guid userId, Guid roleId, CancellationToken ct = default);
     Task RemoveUserRoleAsync(Guid userId, Guid roleId, CancellationToken ct = default);
+    Task AddUserPermissionAsync(Guid userId, Guid permissionId, CancellationToken ct = default);
+    Task RemoveUserPermissionAsync(Guid userId, Guid permissionId, CancellationToken ct = default);
 
     // Roles
     Task<List<RoleListItemDto>> GetAllRolesAsync(CancellationToken ct = default);

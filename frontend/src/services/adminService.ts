@@ -12,6 +12,8 @@ export class AdminService implements IAdminService {
   deleteUser(id: string): Promise<void> { return this.repository.deleteUser(id) }
   addUserRole(userId: string, roleId: string): Promise<void> { return this.repository.addUserRole(userId, roleId) }
   removeUserRole(userId: string, roleId: string): Promise<void> { return this.repository.removeUserRole(userId, roleId) }
+  addUserPermission(userId: string, permissionId: string): Promise<void> { return this.repository.addUserPermission(userId, permissionId) }
+  removeUserPermission(userId: string, permissionId: string): Promise<void> { return this.repository.removeUserPermission(userId, permissionId) }
 
   getAllRoles(): Promise<RoleListItem[]> { return this.repository.getAllRoles() }
   getRole(id: string): Promise<RoleDetail> { return this.repository.getRole(id) }

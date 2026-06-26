@@ -41,6 +41,8 @@ export interface IAdminService {
   deleteUser(id: string): Promise<void>
   addUserRole(userId: string, roleId: string): Promise<void>
   removeUserRole(userId: string, roleId: string): Promise<void>
+  addUserPermission(userId: string, permissionId: string): Promise<void>
+  removeUserPermission(userId: string, permissionId: string): Promise<void>
 
   getAllRoles(): Promise<RoleListItem[]>
   getRole(id: string): Promise<RoleDetail>

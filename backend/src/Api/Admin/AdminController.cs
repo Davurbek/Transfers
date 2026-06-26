@@ -87,6 +87,28 @@ public class AdminController(IAdminService adminService) : ControllerBase
         return NoContent();
     }
 
+    [Authorize(Policy = "permission:admin")]
+    [HttpPost("users/{userId:guid}/permissions")]
+    [EnableRateLimiting("mutations")]
+    public async Task<IActionResult> AddUserPermission(Guid userId, [FromBody] UserPermissionRequest request, CancellationToken ct)
+    {
+        try
+        {
+            await adminService.AddUserPermissionAsync(userId, request.PermissionId, ct);
+            return NoContent();
+        }
+        catch (InvalidOperationException ex) { return NotFound(new { message = ex.Message }); }
+    }
+
+    [Authorize(Policy = "permission:admin")]
+    [HttpDelete("users/{userId:guid}/permissions/{permissionId:guid}")]
+    [EnableRateLimiting("mutations")]
+    public async Task<IActionResult> RemoveUserPermission(Guid userId, Guid permissionId, CancellationToken ct)
+    {
+        await adminService.RemoveUserPermissionAsync(userId, permissionId, ct);
+        return NoContent();
+    }
+
     // ── Roles ──────────────────────────────────────────
     [Authorize(Policy = "permission:admin")]
     [HttpGet("roles")]

@@ -107,12 +107,14 @@ export interface UserDetail {
   isActive: boolean
   createdAt: string
   roles: RoleInfo[]
+  permissions: PermissionInfo[]
 }
 
 export interface UserCreate {
   username: string
   email: string
   password: string
+  roleIds?: string[]
 }
 
 export interface RoleInfo {

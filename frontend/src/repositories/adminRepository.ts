@@ -40,6 +40,14 @@ export class AdminRepository implements IAdminRepository {
     await this.http.delete(`/admin/users/${userId}/roles/${roleId}`)
   }
 
+  async addUserPermission(userId: string, permissionId: string): Promise<void> {
+    await this.http.post(`/admin/users/${userId}/permissions`, { permissionId })
+  }
+
+  async removeUserPermission(userId: string, permissionId: string): Promise<void> {
+    await this.http.delete(`/admin/users/${userId}/permissions/${permissionId}`)
+  }
+
   async getAllRoles(): Promise<RoleListItem[]> {
     const { data } = await this.http.get<RoleListItem[]>('/admin/roles')
     return data

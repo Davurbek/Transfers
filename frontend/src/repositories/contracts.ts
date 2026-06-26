@@ -45,6 +45,8 @@ export interface IAdminRepository {
   deleteUser(id: string): Promise<void>
   addUserRole(userId: string, roleId: string): Promise<void>
   removeUserRole(userId: string, roleId: string): Promise<void>
+  addUserPermission(userId: string, permissionId: string): Promise<void>
+  removeUserPermission(userId: string, permissionId: string): Promise<void>
 
   // Roles
   getAllRoles(): Promise<RoleListItem[]>

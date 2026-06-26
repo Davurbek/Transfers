@@ -2,22 +2,28 @@
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { adminService } from '@/di/container'
-import type { UserListItem, UserCreate } from '@/domain/models'
+import type { UserListItem, UserCreate, RoleListItem } from '@/domain/models'
 
 const router = useRouter()
 const users = ref<UserListItem[]>([])
+const allRoles = ref<RoleListItem[]>([])
 const loading = ref(true)
 const error = ref('')
 const showCreate = ref(false)
 const creating = ref(false)
-const newUser = ref<UserCreate>({ username: '', email: '', password: '' })
+const newUser = ref<UserCreate & { selectedRoleIds: string[] }>({ username: '', email: '', password: '', selectedRoleIds: [] })
 const createError = ref('')
 
 async function load() {
   loading.value = true
   error.value = ''
   try {
-    users.value = await adminService.getAllUsers()
+    const [u, r] = await Promise.all([
+      adminService.getAllUsers(),
+      adminService.getAllRoles(),
+    ])
+    users.value = u
+    allRoles.value = r
   } catch (e: any) {
     error.value = e?.response?.data?.message || e.message || 'Failed to load users'
   } finally {
@@ -25,13 +31,25 @@ async function load() {
   }
 }
 
+function toggleRole(roleId: string) {
+  const idx = newUser.value.selectedRoleIds.indexOf(roleId)
+  if (idx >= 0) newUser.value.selectedRoleIds.splice(idx, 1)
+  else newUser.value.selectedRoleIds.push(roleId)
+}
+
 async function handleCreate() {
   creating.value = true
   createError.value = ''
   try {
-    const user = await adminService.createUser(newUser.value)
+    const payload: UserCreate = {
+      username: newUser.value.username,
+      email: newUser.value.email,
+      password: newUser.value.password,
+      roleIds: newUser.value.selectedRoleIds.length ? newUser.value.selectedRoleIds : undefined,
+    }
+    const user = await adminService.createUser(payload)
     showCreate.value = false
-    newUser.value = { username: '', email: '', password: '' }
+    newUser.value = { username: '', email: '', password: '', selectedRoleIds: [] }
     await load()
     router.push({ name: 'user-detail', params: { id: user.id } })
   } catch (e: any) {
@@ -60,6 +78,16 @@ onMounted(load)
         <input v-model="newUser.username" placeholder="Username" required />
         <input v-model="newUser.email" type="email" placeholder="Email" required />
         <input v-model="newUser.password" type="password" placeholder="Password" required />
+        <div class="role-picker" v-if="allRoles.length">
+          <label class="picker-label">Roles</label>
+          <div class="checkbox-group">
+            <label v-for="r in allRoles" :key="r.id" class="checkbox-item">
+              <input type="checkbox" :checked="newUser.selectedRoleIds.includes(r.id)" @change="toggleRole(r.id)" />
+              <span>{{ r.name }}</span>
+            </label>
+          </div>
+          <p v-if="!allRoles.length" class="muted">No roles available.</p>
+        </div>
         <p class="error" v-if="createError">{{ createError }}</p>
         <button type="submit" :disabled="creating">{{ creating ? 'Creating…' : 'Create' }}</button>
       </form>
@@ -99,6 +127,10 @@ onMounted(load)
 <style scoped>
 .create-form { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; max-width: 400px; }
 .create-form input { width: 100%; }
+.role-picker { display: flex; flex-direction: column; gap: 6px; }
+.picker-label { font-size: 13px; font-weight: 500; color: var(--text-dim); }
+.checkbox-group { display: flex; flex-wrap: wrap; gap: 8px; }
+.checkbox-item { display: flex; align-items: center; gap: 6px; font-size: 13px; padding: 6px 10px; background: rgba(255,255,255,0.03); border-radius: var(--radius-sm); border: 1px solid var(--border); cursor: pointer; }
 .clickable-row { cursor: pointer; }
 .role-tags { display: flex; gap: 4px; flex-wrap: wrap; }
 .role-tag { background: var(--primary-subtle); color: var(--primary); padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }

@@ -8,13 +8,16 @@ namespace Universal.Transfers.Infrastructure.Auth.Persistence;
 public sealed class AdminRepository(AppDbContext db) : IAdminRepository
 {
     public async Task<List<User>> GetAllUsersAsync(CancellationToken ct = default) =>
-        await db.Users.Include(u => u.UserRoles).ThenInclude(ur => ur.Role).OrderBy(u => u.Username).ToListAsync(ct);
+        await db.Users.Include(u => u.UserRoles).ThenInclude(ur => ur.Role).Include(u => u.UserPermissions).ThenInclude(up => up.Permission).OrderBy(u => u.Username).ToListAsync(ct);
 
     public Task<User?> GetUserByIdAsync(Guid id, CancellationToken ct = default) =>
         db.Users.FirstOrDefaultAsync(u => u.Id == id, ct);
 
     public Task<User?> GetUserWithRolesAsync(Guid id, CancellationToken ct = default) =>
         db.Users.Include(u => u.UserRoles).ThenInclude(ur => ur.Role).FirstOrDefaultAsync(u => u.Id == id, ct);
+
+    public Task<User?> GetUserWithPermissionsAsync(Guid id, CancellationToken ct = default) =>
+        db.Users.Include(u => u.UserRoles).ThenInclude(ur => ur.Role).Include(u => u.UserPermissions).ThenInclude(up => up.Permission).FirstOrDefaultAsync(u => u.Id == id, ct);
 
     public Task<bool> UsernameExistsAsync(string username, CancellationToken ct = default) =>
         db.Users.AnyAsync(u => u.Username == username, ct);
@@ -94,4 +97,16 @@ public sealed class AdminRepository(AppDbContext db) : IAdminRepository
 
     public Task<bool> RoleHasPermissionAsync(Guid roleId, Guid permissionId, CancellationToken ct = default) =>
         db.RolePermissions.AnyAsync(x => x.RoleId == roleId && x.PermissionId == permissionId, ct);
+
+    public async Task AddUserPermissionAsync(UserPermission userPermission, CancellationToken ct = default) =>
+        await db.UserPermissions.AddAsync(userPermission, ct);
+
+    public async Task RemoveUserPermissionAsync(Guid userId, Guid permissionId, CancellationToken ct = default)
+    {
+        var up = await db.UserPermissions.FirstOrDefaultAsync(x => x.UserId == userId && x.PermissionId == permissionId, ct);
+        if (up is not null) db.UserPermissions.Remove(up);
+    }
+
+    public Task<bool> UserHasPermissionAsync(Guid userId, Guid permissionId, CancellationToken ct = default) =>
+        db.UserPermissions.AnyAsync(x => x.UserId == userId && x.PermissionId == permissionId, ct);
 }
