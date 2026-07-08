@@ -28,6 +28,10 @@ public sealed class KafkaEventConsumer : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        _logger.LogInformation(
+            "KafkaEventConsumer starting | BootstrapServers={Bootstrap} | GroupId={Group} | ClientId={Client} | EventsTopic={Topic} | DlqTopic={Dlq}",
+            _options.BootstrapServers, _options.GroupId, _options.ClientId, _options.EventsTopic, _options.DlqTopic);
+
         var config = new ConsumerConfig
         {
             BootstrapServers = _options.BootstrapServers,
@@ -40,7 +44,7 @@ public sealed class KafkaEventConsumer : BackgroundService
         using var consumer = new ConsumerBuilder<string, string>(config).Build();
         consumer.Subscribe(_options.EventsTopic);
 
-        _logger.LogInformation("Kafka consumer started, listening to {Topic}", _options.EventsTopic);
+        _logger.LogInformation("Kafka consumer started, subscribed to topic '{Topic}' and waiting for messages", _options.EventsTopic);
 
         try
         {
@@ -49,15 +53,29 @@ public sealed class KafkaEventConsumer : BackgroundService
                 try
                 {
                     var result = consumer.Consume(stoppingToken);
+
+                    _logger.LogInformation(
+                        "Kafka message received | Topic={Topic} | Partition={Partition} | Offset={Offset} | Key={Key} | ValueSize={Size} bytes",
+                        result.Topic, result.Partition, result.Offset, result.Message.Key, result.Message.Value.Length);
+
                     await ProcessMessageWithRetryAsync(result, stoppingToken);
                     consumer.Commit(result);
+
+                    _logger.LogDebug("Kafka offset {Offset} committed successfully", result.Offset);
+                }
+                catch (ConsumeException ex) when (ex.Error.IsLocalError)
+                {
+                    _logger.LogError(ex, "Kafka local consume error: {Reason}", ex.Error.Reason);
+                    await Task.Delay(1000, stoppingToken);
                 }
                 catch (ConsumeException ex)
                 {
-                    _logger.LogError(ex, "Kafka consume error: {Reason}", ex.Error.Reason);
+                    _logger.LogError(ex, "Kafka consume error: {Reason} | Code={Code} | IsFatal={IsFatal}",
+                        ex.Error.Reason, ex.Error.Code, ex.Error.IsFatal);
                 }
                 catch (OperationCanceledException)
                 {
+                    _logger.LogInformation("Kafka consumer cancellation requested, shutting down");
                     break;
                 }
             }
@@ -65,7 +83,7 @@ public sealed class KafkaEventConsumer : BackgroundService
         finally
         {
             consumer.Close();
-            _logger.LogInformation("Kafka consumer stopped");
+            _logger.LogInformation("Kafka consumer stopped and connection closed");
         }
     }
 
@@ -76,20 +94,24 @@ public sealed class KafkaEventConsumer : BackgroundService
             try
             {
                 await ProcessMessageAsync(result, ct);
+
+                _logger.LogInformation(
+                    "Event processing succeeded | Offset={Offset} | Attempt={Attempt} | Topic={Topic} | Partition={Partition}",
+                    result.Offset, attempt, result.Topic, result.Partition);
                 return;
             }
             catch (Exception ex) when (attempt < MaxRetries)
             {
                 _logger.LogWarning(ex,
-                    "Failed to process event at offset {Offset} (attempt {Attempt}/{MaxRetries}), retrying...",
-                    result.Offset, attempt, MaxRetries);
+                    "Event processing failed at offset {Offset} (attempt {Attempt}/{MaxRetries}), retrying in {Delay}ms...",
+                    result.Offset, attempt, MaxRetries, 100 * attempt);
                 await Task.Delay(TimeSpan.FromMilliseconds(100 * attempt), ct);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex,
-                    "Failed to process event at offset {Offset} after {MaxRetries} attempts, sending to DLQ",
-                    result.Offset, MaxRetries);
+                    "Event processing failed at offset {Offset} after {MaxRetries} attempts, routing to DLQ topic '{DlqTopic}'",
+                    result.Offset, MaxRetries, _options.DlqTopic);
                 await SendToDlqAsync(result, ct);
                 return;
             }
@@ -98,24 +120,32 @@ public sealed class KafkaEventConsumer : BackgroundService
 
     private async Task ProcessMessageAsync(ConsumeResult<string, string> result, CancellationToken ct)
     {
+        _logger.LogDebug("Deserializing event at offset {Offset}: {Value}", result.Offset, result.Message.Value);
+
         var @event = JsonSerializer.Deserialize<TransferEvent>(result.Message.Value, JsonOpts);
         if (@event is null)
         {
-            _logger.LogWarning("Null event deserialized from topic {Topic} offset {Offset}",
-                result.Topic, result.Offset);
+            _logger.LogWarning("Null event deserialized from topic '{Topic}' offset {Offset} - raw: {Raw}",
+                result.Topic, result.Offset, result.Message.Value);
             return;
         }
+
+        _logger.LogInformation("Projecting event | Type={Type} | Offset={Offset} | EventData={EventData}",
+            @event.GetType().Name, result.Offset,
+            JsonSerializer.Serialize(@event, JsonOpts));
 
         using var scope = _scopeFactory.CreateScope();
         var projector = scope.ServiceProvider.GetRequiredService<IEventProjector>();
         await projector.ProjectAsync(@event, ct);
 
-        _logger.LogInformation("Projected event {Type} at offset {Offset}",
-            @event.GetType().Name, result.Offset);
+        _logger.LogInformation("Event {Type} successfully projected at offset {Offset}", @event.GetType().Name, result.Offset);
     }
 
     private async Task SendToDlqAsync(ConsumeResult<string, string> result, CancellationToken ct)
     {
+        _logger.LogWarning("Moving event to DLQ | OriginalTopic={Topic} | Offset={Offset} | Partition={Partition} | DLQ={DlqTopic}",
+            result.Topic, result.Offset, result.Partition, _options.DlqTopic);
+
         try
         {
             using var producer = new ProducerBuilder<string, string>(new ProducerConfig
@@ -123,7 +153,7 @@ public sealed class KafkaEventConsumer : BackgroundService
                 BootstrapServers = _options.BootstrapServers,
             }).Build();
 
-            await producer.ProduceAsync(_options.DlqTopic, new Message<string, string>
+            var dlqResult = await producer.ProduceAsync(_options.DlqTopic, new Message<string, string>
             {
                 Key = result.Message.Key,
                 Value = result.Message.Value,
@@ -132,15 +162,18 @@ public sealed class KafkaEventConsumer : BackgroundService
                     new Header("original-topic", System.Text.Encoding.UTF8.GetBytes(result.Topic)),
                     new Header("original-offset", System.Text.Encoding.UTF8.GetBytes(result.Offset.ToString())),
                     new Header("original-partition", System.Text.Encoding.UTF8.GetBytes(result.Partition.ToString())),
+                    new Header("dlq-timestamp", System.Text.Encoding.UTF8.GetBytes(DateTime.UtcNow.ToString("O"))),
                 },
             }, ct);
 
-            _logger.LogWarning("Event at offset {Offset} moved to DLQ topic {DlqTopic}",
-                result.Offset, _options.DlqTopic);
+            _logger.LogWarning(
+                "Event moved to DLQ | DLQTopic={DlqTopic} | DLQPartition={Partition} | DLQOffset={Offset} | OriginalOffset={OriginalOffset}",
+                _options.DlqTopic, dlqResult.Partition, dlqResult.Offset, result.Offset);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to send event to DLQ at offset {Offset}", result.Offset);
+            _logger.LogError(ex, "CRITICAL: Failed to send event to DLQ topic '{DlqTopic}' - event at original offset {Offset} may be lost",
+                _options.DlqTopic, result.Offset);
         }
     }
 }

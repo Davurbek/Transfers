@@ -55,6 +55,7 @@ public sealed class TransactionRepository(AppDbContext db) : ITransactionReposit
             .Include(t => t.StatusHistory)
             .Include(t => t.CreditAttempts)
             .Include(t => t.PartnerRegistrations)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(t => t.TransactionId == transactionId, ct);
 
     public async Task AddAsync(Transaction transaction, CancellationToken ct = default) =>

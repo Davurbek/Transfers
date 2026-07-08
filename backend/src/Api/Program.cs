@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using Serilog;
 using System.Text;
 using System.Threading.RateLimiting;
 using Universal.Transfers.Api.Auth;
@@ -16,13 +17,31 @@ using Universal.Transfers.Infrastructure.Common.Persistence;
 using Universal.Transfers.Infrastructure.Messaging.Kafka;
 using Universal.Transfers.Infrastructure.Seeding;
 
-var builder = WebApplication.CreateBuilder(args);
+Log.Logger = new LoggerConfiguration()
+    .WriteTo.Console()
+    .CreateBootstrapLogger();
+
+try
+{
+    var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
 builder.Services.Configure<KafkaOptions>(builder.Configuration.GetSection(KafkaOptions.SectionName));
 var jwt = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
 if (jwt.SigningKey.Length < 32)
     throw new InvalidOperationException("JWT SigningKey must be at least 32 characters. Set Jwt:SigningKey via environment variable or user secrets.");
+builder.Host.UseSerilog((context, services, configuration) => configuration
+    .ReadFrom.Configuration(context.Configuration)
+    .ReadFrom.Services(services)
+    .Enrich.FromLogContext()
+    .WriteTo.Console()
+    .WriteTo.File(
+        context.Configuration.GetValue<string>("Serilog:File:Path") ?? "logs/api-.log",
+        rollingInterval: RollingInterval.Day,
+        retainedFileCountLimit: context.Configuration.GetValue<int?>("Serilog:File:RetainedFileCountLimit") ?? 31,
+        fileSizeLimitBytes: context.Configuration.GetValue<long?>("Serilog:File:FileSizeLimitBytes") ?? 10L * 1024 * 1024,
+        rollOnFileSizeLimit: true));
+
 var demoPassword = builder.Configuration.GetValue<string>("SeedData:DemoPassword")
     ?? throw new InvalidOperationException("SeedData:DemoPassword is not configured. Set it via environment variable or user secrets.");
 
@@ -190,3 +209,12 @@ app.MapGet("/health/ready", () => Results.Ok(new { status = "ready" })).AllowAno
 app.MapGet("/health/live", () => Results.Ok(new { status = "alive" })).AllowAnonymous();
 
 app.Run();
+}
+catch (Exception ex)
+{
+    Log.Fatal(ex, "Application terminated unexpectedly");
+}
+finally
+{
+    Log.CloseAndFlush();
+}

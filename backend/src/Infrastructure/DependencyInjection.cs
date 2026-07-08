@@ -50,6 +50,7 @@ public static class DependencyInjection
 
         services.AddSingleton<ICommandPublisher, KafkaCommandPublisher>();
         services.AddHostedService<KafkaEventConsumer>();
+        services.AddHostedService<KafkaCommandConsumer>();
 
         return services;
     }
