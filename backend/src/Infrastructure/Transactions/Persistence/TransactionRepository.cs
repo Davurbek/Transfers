@@ -52,17 +52,17 @@ public sealed class TransactionRepository(AppDbContext db) : ITransactionReposit
 
     public Task<Transaction?> GetDetailAsync(string transactionId, CancellationToken ct = default) =>
         db.Transactions.AsNoTracking()
-            .Include(t => t.StatusHistory)
-            .Include(t => t.CreditAttempts)
-            .Include(t => t.PartnerRegistrations)
+            .Include(t => t.StatusHistory.OrderBy(h => h.OccurredAt).ThenBy(h => h.Id))
+            .Include(t => t.CreditAttempts.OrderBy(c => c.AttemptedAt).ThenBy(c => c.Id))
+            .Include(t => t.PartnerRegistrations.OrderBy(p => p.RegisteredAt).ThenBy(p => p.Id))
             .AsSplitQuery()
             .FirstOrDefaultAsync(t => t.TransactionId == transactionId, ct);
 
     public Task<Transaction?> GetDetailByInternalRefAsync(string internalRef, CancellationToken ct = default) =>
         db.Transactions.AsNoTracking()
-            .Include(t => t.StatusHistory)
-            .Include(t => t.CreditAttempts)
-            .Include(t => t.PartnerRegistrations)
+            .Include(t => t.StatusHistory.OrderBy(h => h.OccurredAt).ThenBy(h => h.Id))
+            .Include(t => t.CreditAttempts.OrderBy(c => c.AttemptedAt).ThenBy(c => c.Id))
+            .Include(t => t.PartnerRegistrations.OrderBy(p => p.RegisteredAt).ThenBy(p => p.Id))
             .AsSplitQuery()
             .FirstOrDefaultAsync(t => t.InternalRef == internalRef, ct);
 

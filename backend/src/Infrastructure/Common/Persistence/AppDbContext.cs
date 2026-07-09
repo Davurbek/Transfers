@@ -23,6 +23,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<ProcessedMessage> ProcessedMessages => Set<ProcessedMessage>();
+    public DbSet<InboxEvent> InboxEvents => Set<InboxEvent>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -90,6 +91,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.CreditGateway).HasConversion<string>();
             e.Property(x => x.RemitterPartner).HasMaxLength(32);
             e.Property(x => x.PartnerRef).HasMaxLength(64);
+            e.Property(x => x.PaymentPartner).HasMaxLength(32);
         });
 
         b.Entity<TransactionStatusHistory>(e =>
@@ -130,5 +132,6 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         });
 
         b.ApplyConfiguration(new Inbox.Persistence.Configurations.ProcessedMessageConfiguration());
+        b.ApplyConfiguration(new Inbox.Persistence.Configurations.InboxEventConfiguration());
     }
 }

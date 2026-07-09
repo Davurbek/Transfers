@@ -103,7 +103,7 @@ public class EventProjector(
             InternalRef = e.InternalRef,
             PartnerRef = e.PartnerRef,
             TransactionId = e.InternalRef,
-            UserId = e.RemitterPartnerCode,
+            UserId = string.Empty,
             RecipientName = e.ReceiverCardLast4,
             Amount = e.CreditAmount,
             Currency = e.CreditAmountCurrency,
@@ -113,6 +113,7 @@ public class EventProjector(
             CreatedAt = new DateTimeOffset(e.OccurredOn, TimeSpan.Zero),
             UpdatedAt = new DateTimeOffset(e.OccurredOn, TimeSpan.Zero),
             RemitterPartner = e.RemitterPartnerCode,
+            PaymentPartner = e.PaymentPartner,
         };
         await txRepo.AddAsync(tx, ct);
 
@@ -162,6 +163,9 @@ public class EventProjector(
     private async Task ProjectCreditFailedAsync(TransactionCreditFailedEvent e, CancellationToken ct)
     {
         var tx = await GetOrCreateTransaction(e.InternalRef, ct);
+
+        if (e.PartnerRef is not null)
+            tx.PartnerRef = e.PartnerRef;
 
         var eventId = $"{e.InternalRef}-ca-{e.TotalAttempts}";
         if (await txRepo.CreditAttemptExistsAsync(eventId, ct))

@@ -5,6 +5,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
 using Universal.Transfers.Application.Messaging;
+using Universal.Transfers.Domain.Inbox.Entities;
+using Universal.Transfers.Domain.Inbox.Interfaces;
 
 namespace Universal.Transfers.Infrastructure.Messaging.Kafka;
 
@@ -133,16 +135,59 @@ public sealed class KafkaEventConsumer : BackgroundService
             return;
         }
 
-        _logger.LogInformation("Projecting event | Type={Type} | Offset={Offset} | EventData={EventData}",
-            @event.GetType().Name, result.Offset,
-            JsonSerializer.Serialize(@event, JsonOpts));
+        var occurredOn = GetOccurredOn(@event);
+        var internalRef = GetInternalRef(@event);
+
+        _logger.LogInformation("Storing event in inbox | Type={Type} | InternalRef={Ref} | OccurredOn={OccurredOn} | Offset={Offset}",
+            @event.GetType().Name, internalRef, occurredOn, result.Offset);
 
         using var scope = _scopeFactory.CreateScope();
-        var projector = scope.ServiceProvider.GetRequiredService<IEventProjector>();
-        await projector.ProjectAsync(@event, ct);
+        var inboxRepo = scope.ServiceProvider.GetRequiredService<IInboxEventRepository>();
 
-        _logger.LogInformation("Event {Type} successfully projected at offset {Offset}", @event.GetType().Name, result.Offset);
+        var inboxEvent = new InboxEvent
+        {
+            InternalRef = internalRef,
+            EventType = @event.GetType().Name,
+            Payload = result.Message.Value,
+            OccurredOn = occurredOn,
+            ReceivedAt = DateTime.UtcNow,
+        };
+
+        await inboxRepo.AddAsync(inboxEvent, ct);
+        await inboxRepo.SaveChangesAsync(ct);
+
+        _logger.LogInformation("Event {Type} stored in inbox at offset {Offset}", @event.GetType().Name, result.Offset);
     }
+
+    private static string GetInternalRef(TransferEvent @event) => @event switch
+    {
+        TransactionInitiatedEvent e => e.InternalRef,
+        TransactionCreditCompletedEvent e => e.InternalRef,
+        TransactionCreditFailedEvent e => e.InternalRef,
+        TransactionCreditFailedRetryEvent e => e.InternalRef,
+        TransactionCreditRetryRequestedEvent e => e.InternalRef,
+        TransactionRegistrationCompletedEvent e => e.InternalRef,
+        TransactionRegistrationFailedRetryEvent e => e.InternalRef,
+        TransactionRegistrationRetryRequestedEvent e => e.InternalRef,
+        TransactionPausedEvent e => e.InternalRef,
+        TransactionUnpausedEvent e => e.InternalRef,
+        _ => "unknown",
+    };
+
+    private static DateTime GetOccurredOn(TransferEvent @event) => @event switch
+    {
+        TransactionInitiatedEvent e => e.OccurredOn,
+        TransactionCreditCompletedEvent e => e.OccurredOn,
+        TransactionCreditFailedEvent e => e.OccurredOn,
+        TransactionCreditFailedRetryEvent e => e.OccurredOn,
+        TransactionCreditRetryRequestedEvent e => e.OccurredOn,
+        TransactionRegistrationCompletedEvent e => e.OccurredOn,
+        TransactionRegistrationFailedRetryEvent e => e.OccurredOn,
+        TransactionRegistrationRetryRequestedEvent e => e.OccurredOn,
+        TransactionPausedEvent e => e.OccurredOn,
+        TransactionUnpausedEvent e => e.OccurredOn,
+        _ => DateTime.MinValue,
+    };
 
     private async Task SendToDlqAsync(ConsumeResult<string, string> result, CancellationToken ct)
     {

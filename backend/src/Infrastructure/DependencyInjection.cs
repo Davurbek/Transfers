@@ -36,6 +36,7 @@ public static class DependencyInjection
         services.AddScoped<IAuditRepository, AuditRepository>();
 
         services.AddScoped<IProcessedMessageRepository, ProcessedMessageRepository>();
+        services.AddScoped<IInboxEventRepository, InboxEventRepository>();
 
         services.AddScoped<IEventProjector, EventProjector>();
 
@@ -51,6 +52,7 @@ public static class DependencyInjection
         services.AddSingleton<ICommandPublisher, KafkaCommandPublisher>();
         services.AddHostedService<KafkaEventConsumer>();
         services.AddHostedService<KafkaCommandConsumer>();
+        services.AddHostedService<InboxEventProcessor>();
 
         return services;
     }

@@ -19,6 +19,7 @@ public class Transaction
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
     public CreditGateway CreditGateway { get; set; }
     public string RemitterPartner { get; set; } = string.Empty;
+    public string? PaymentPartner { get; set; }
 
     public ICollection<TransactionStatusHistory> StatusHistory { get; set; } = new List<TransactionStatusHistory>();
     public ICollection<CreditAttempt> CreditAttempts { get; set; } = new List<CreditAttempt>();

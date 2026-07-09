@@ -13,7 +13,8 @@ public record TransactionListItemDto(
     TransactionStatus CurrentStatus,
     bool IsPaused,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    string? PaymentPartner);
 
 public record TransactionDetailDto(
     string InternalRef,
@@ -27,6 +28,7 @@ public record TransactionDetailDto(
     bool IsPaused,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
+    string? PaymentPartner,
     List<StatusHistoryDto> StatusHistory,
     List<CreditAttemptDto> CreditAttempts,
     List<PartnerRegistrationDto> PartnerRegistrations);
