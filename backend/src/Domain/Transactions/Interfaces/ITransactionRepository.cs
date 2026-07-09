@@ -10,6 +10,7 @@ public interface ITransactionRepository
     Task<Transaction?> GetByTransactionIdAsync(string transactionId, CancellationToken ct = default);
     Task<Transaction?> GetByInternalRefAsync(string internalRef, CancellationToken ct = default);
     Task<Transaction?> GetDetailAsync(string transactionId, CancellationToken ct = default);
+    Task<Transaction?> GetDetailByInternalRefAsync(string internalRef, CancellationToken ct = default);
     Task AddAsync(Transaction transaction, CancellationToken ct = default);
     void AddStatusHistory(TransactionStatusHistory history);
     void AddCreditAttempt(CreditAttempt attempt);

@@ -129,8 +129,8 @@ public sealed class KafkaCommandConsumer : BackgroundService
             }
 
             _logger.LogInformation(
-                "UnpauseTransactionCommand deserialized | TransactionId={TxId} | IssuedByUser={User} | CommandId={CmdId}",
-                command.TransactionId, command.IssuedByUser, command.CommandId);
+                "UnpauseTransactionCommand deserialized | InternalRef={InternalRef} | IssuedByUser={User} | CommandId={CmdId}",
+                command.InternalRef, command.IssuedByUser, command.CommandId);
 
             await ProcessUnpauseCommandAsync(command, ct);
         }
@@ -143,17 +143,17 @@ public sealed class KafkaCommandConsumer : BackgroundService
     private async Task ProcessUnpauseCommandAsync(UnpauseTransactionCommand command, CancellationToken ct)
     {
         _logger.LogInformation(
-            "Processing UnpauseTransactionCommand for transaction {TransactionId} by user {User}",
-            command.TransactionId, command.IssuedByUser);
+            "Processing UnpauseTransactionCommand for transaction {InternalRef} by user {User}",
+            command.InternalRef, command.IssuedByUser);
 
-        var txRef = command.TransactionId;
+        var txRef = command.InternalRef;
 
         TransactionStatus resumeTo;
         using (var scope = _scopeFactory.CreateScope())
         {
             var repo = scope.ServiceProvider.GetRequiredService<ITransactionRepository>();
             _logger.LogInformation("Fetching transaction {TxId} from database to determine resume state", txRef);
-            var tx = await repo.GetDetailAsync(txRef, ct);
+            var tx = await repo.GetDetailByInternalRefAsync(txRef, ct);
 
             if (tx is null)
             {
@@ -180,17 +180,8 @@ public sealed class KafkaCommandConsumer : BackgroundService
             _logger.LogInformation("Resume target determined for {TxId}: {ResumeTo}", txRef, resumeTo);
         }
 
-        _logger.LogInformation("Step 1/3: Publishing TransactionStatusChanged: Paused -> {ResumeTo} for {TxId}", resumeTo, txRef);
-        await PublishEventAsync(new TransactionStatusChanged
-        {
-            TransactionId = txRef,
-            InternalRef = txRef,
-            FromStatus = TransactionStatus.Paused,
-            ToStatus = resumeTo,
-            Reason = $"Unpaused by {command.IssuedByUser}; resuming from {resumeTo}",
-            IsPaused = false,
-            OccurredAt = DateTimeOffset.UtcNow,
-        }, ct);
+        _logger.LogInformation("Step 1/3: Publishing TransactionUnpausedEvent: Paused -> {ResumeTo} for {TxId}", resumeTo, txRef);
+        await PublishEventAsync(new TransactionUnpausedEvent(txRef, resumeTo, DateTime.UtcNow), ct);
 
         _logger.LogInformation("Waiting 500ms before step 2/3 for {TxId}...", txRef);
         await Task.Delay(500, ct);
@@ -198,29 +189,31 @@ public sealed class KafkaCommandConsumer : BackgroundService
         var finalStatus = resumeTo == TransactionStatus.CreditFailedRetry
             ? TransactionStatus.CreditSucceeded
             : TransactionStatus.RegistrationSucceeded;
-        var finalReason = resumeTo == TransactionStatus.CreditFailedRetry
-            ? "Credit succeeded after manual unpause via Kafka"
-            : "Partner registration succeeded after manual unpause via Kafka";
 
-        _logger.LogInformation("Step 2/3: Publishing TransactionStatusChanged: {ResumeTo} -> {FinalStatus} for {TxId}",
-            resumeTo, finalStatus, txRef);
-        await PublishEventAsync(new TransactionStatusChanged
+        _logger.LogInformation("Step 2/3: Publishing success event for {TxId} | FinalStatus={FinalStatus}", txRef, finalStatus);
+
+        if (finalStatus == TransactionStatus.CreditSucceeded)
         {
-            TransactionId = txRef,
-            InternalRef = txRef,
-            FromStatus = resumeTo,
-            ToStatus = finalStatus,
-            Reason = finalReason,
-            IsPaused = false,
-            OccurredAt = DateTimeOffset.UtcNow,
-        }, ct);
+            await PublishEventAsync(new TransactionCreditCompletedEvent(txRef, 1, DateTime.UtcNow), ct);
+        }
+        else
+        {
+            await PublishEventAsync(new TransactionRegistrationCompletedEvent(txRef, command.IssuedByUser, 1, DateTime.UtcNow), ct);
+        }
 
         _logger.LogInformation("Step 3/3: Unpause command fully processed for transaction {TxId}", txRef);
     }
 
-    private async Task PublishEventAsync(TransactionStatusChanged @event, CancellationToken ct)
+    private async Task PublishEventAsync(TransferEvent @event, CancellationToken ct)
     {
-        var key = @event.TransactionId;
+        var key = @event switch
+        {
+            TransactionUnpausedEvent e => e.InternalRef,
+            TransactionCreditCompletedEvent e => e.InternalRef,
+            TransactionRegistrationCompletedEvent e => e.InternalRef,
+            _ => throw new InvalidOperationException($"Unsupported event type: {@event.GetType().Name}"),
+        };
+
         var value = JsonSerializer.Serialize<TransferEvent>(@event, JsonOpts);
 
         _logger.LogInformation(

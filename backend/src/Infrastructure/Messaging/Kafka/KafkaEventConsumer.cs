@@ -13,7 +13,10 @@ public sealed class KafkaEventConsumer : BackgroundService
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly KafkaOptions _options;
     private readonly ILogger<KafkaEventConsumer> _logger;
-    private static readonly JsonSerializerOptions JsonOpts = new();
+    private static readonly JsonSerializerOptions JsonOpts = new()
+    {
+        PropertyNameCaseInsensitive = true,
+    };
     private const int MaxRetries = 3;
 
     public KafkaEventConsumer(

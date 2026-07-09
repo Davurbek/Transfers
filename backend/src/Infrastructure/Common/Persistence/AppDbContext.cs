@@ -89,6 +89,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.CurrentStatus).HasConversion<string>();
             e.Property(x => x.CreditGateway).HasConversion<string>();
             e.Property(x => x.RemitterPartner).HasMaxLength(32);
+            e.Property(x => x.PartnerRef).HasMaxLength(64);
         });
 
         b.Entity<TransactionStatusHistory>(e =>

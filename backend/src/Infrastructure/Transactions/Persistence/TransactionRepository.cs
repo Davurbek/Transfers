@@ -58,6 +58,14 @@ public sealed class TransactionRepository(AppDbContext db) : ITransactionReposit
             .AsSplitQuery()
             .FirstOrDefaultAsync(t => t.TransactionId == transactionId, ct);
 
+    public Task<Transaction?> GetDetailByInternalRefAsync(string internalRef, CancellationToken ct = default) =>
+        db.Transactions.AsNoTracking()
+            .Include(t => t.StatusHistory)
+            .Include(t => t.CreditAttempts)
+            .Include(t => t.PartnerRegistrations)
+            .AsSplitQuery()
+            .FirstOrDefaultAsync(t => t.InternalRef == internalRef, ct);
+
     public async Task AddAsync(Transaction transaction, CancellationToken ct = default) =>
         await db.Transactions.AddAsync(transaction, ct);
 

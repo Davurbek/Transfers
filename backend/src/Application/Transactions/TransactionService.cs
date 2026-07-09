@@ -49,16 +49,16 @@ public class TransactionService(
         return tx is null ? null : TransactionMappings.ToDetailDto(tx);
     }
 
-    public async Task<UnpauseResult> UnpauseAsync(string transactionId, Guid userId, string username, string ipAddress, CancellationToken ct = default)
+    public async Task<UnpauseResult> UnpauseAsync(string internalRef, Guid userId, string username, string ipAddress, CancellationToken ct = default)
     {
-        var tx = await txRepo.GetByTransactionIdAsync(transactionId, ct);
+        var tx = await txRepo.GetByInternalRefAsync(internalRef, ct);
         if (tx is null)
             return new UnpauseResult(UnpauseOutcome.NotFound, null);
 
         if (!tx.IsPaused || tx.CurrentStatus != Domain.Transactions.Enums.TransactionStatus.Paused)
             return new UnpauseResult(UnpauseOutcome.NotPaused, null);
 
-        var command = new UnpauseTransactionCommand(transactionId, username);
+        var command = new UnpauseTransactionCommand(internalRef, username);
         await commandPublisher.PublishAsync(command, ct);
 
         var audit = new AuditLog
@@ -66,14 +66,14 @@ public class TransactionService(
             UserId = userId,
             Username = username,
             ActionType = "tx:unpause",
-            TargetTransactionId = transactionId,
+            TargetTransactionId = internalRef,
             IpAddress = ipAddress,
             Metadata = """{"source":"dashboard"}""",
         };
         await auditRepo.AddAsync(audit, ct);
         await auditRepo.SaveChangesAsync(ct);
 
-        logger.LogInformation("Unpause command published for {TxId} by {User}", transactionId, username);
+        logger.LogInformation("Unpause command published for {InternalRef} by {User}", internalRef, username);
         return new UnpauseResult(UnpauseOutcome.Accepted, command.CommandId);
     }
 }

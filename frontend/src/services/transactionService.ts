@@ -30,7 +30,7 @@ export class TransactionService implements ITransactionService {
     return this.repository.getDetail(transactionId)
   }
 
-  unpause(transactionId: string): Promise<ActionAcceptedResponse> {
-    return this.repository.unpause(transactionId)
+  unpause(internalRef: string): Promise<ActionAcceptedResponse> {
+    return this.repository.unpause(internalRef)
   }
 }

@@ -51,13 +51,13 @@ public sealed class SimulatedBroker(
         switch (command)
         {
             case UnpauseTransactionCommand unpause:
-                var txRef = unpause.TransactionId;
+                var txRef = unpause.InternalRef;
 
                 TransactionStatus resumeTo;
                 using (var scope = services.CreateScope())
                 {
                     var repo = scope.ServiceProvider.GetRequiredService<ITransactionRepository>();
-                    var tx = await repo.GetDetailAsync(txRef, ct);
+                    var tx = await repo.GetDetailByInternalRefAsync(txRef, ct);
                     var lastBeforePause = tx?.StatusHistory
                         .Where(h => h.ToStatus == TransactionStatus.Paused)
                         .MaxBy(h => h.OccurredAt)?.FromStatus;
@@ -68,32 +68,23 @@ public sealed class SimulatedBroker(
                     };
                 }
 
-                await EmitAsync(new TransactionStatusChanged
-                {
-                    TransactionId = txRef,
-                    FromStatus = TransactionStatus.Paused,
-                    ToStatus = resumeTo,
-                    Reason = $"Unpaused by {unpause.IssuedByUser}; resuming from {resumeTo}",
-                    IsPaused = false,
-                }, ct);
-
+                // Simulated UnpausedEvent (mimics api-v2 behaviour)
+                await EmitAsync(new TransactionUnpausedEvent(txRef, resumeTo, DateTime.UtcNow), ct);
                 await Task.Delay(_delayMs, ct);
 
+                // Simulated success event after unpause
                 var finalStatus = resumeTo == TransactionStatus.CreditFailedRetry
                     ? TransactionStatus.CreditSucceeded
                     : TransactionStatus.RegistrationSucceeded;
-                var finalReason = resumeTo == TransactionStatus.CreditFailedRetry
-                    ? "Credit succeeded after manual unpause"
-                    : "Partner registration succeeded after manual unpause";
 
-                await EmitAsync(new TransactionStatusChanged
+                if (finalStatus == TransactionStatus.CreditSucceeded)
                 {
-                    TransactionId = txRef,
-                    FromStatus = resumeTo,
-                    ToStatus = finalStatus,
-                    Reason = finalReason,
-                    IsPaused = false,
-                }, ct);
+                    await EmitAsync(new TransactionCreditCompletedEvent(txRef, 1, DateTime.UtcNow), ct);
+                }
+                else
+                {
+                    await EmitAsync(new TransactionRegistrationCompletedEvent(txRef, unpause.IssuedByUser, 1, DateTime.UtcNow), ct);
+                }
                 break;
 
             default:

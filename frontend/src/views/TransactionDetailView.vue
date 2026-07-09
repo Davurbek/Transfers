@@ -33,7 +33,7 @@ async function onUnpause() {
   acting.value = true
   actionMsg.value = null
   try {
-    const res = await transactionService.unpause(detail.value.transactionId)
+    const res = await transactionService.unpause(detail.value.internalRef)
     actionMsg.value = `Command sent (${res.commandId.slice(0, 8)}…)`
     startPolling()
   } catch (e) {

@@ -5,38 +5,80 @@ namespace Universal.Transfers.Application.Messaging;
 
 [JsonDerivedType(typeof(UnpauseTransactionCommand), typeDiscriminator: "UnpauseTransactionCommand")]
 public abstract record TransferCommand(string CommandId, string IssuedByUser);
-public record UnpauseTransactionCommand(string TransactionId, string IssuedByUser) : TransferCommand(Guid.NewGuid().ToString(), IssuedByUser);
+public record UnpauseTransactionCommand(string InternalRef, string IssuedByUser) : TransferCommand(Guid.NewGuid().ToString(), IssuedByUser);
 
-[JsonDerivedType(typeof(TransactionUpserted), typeDiscriminator: "TransactionUpserted")]
-[JsonDerivedType(typeof(TransactionStatusChanged), typeDiscriminator: "TransactionStatusChanged")]
-public abstract class TransferEvent;
-public class TransactionUpserted : TransferEvent
-{
-    public string InternalRef { get; init; } = string.Empty;
-    public string TransactionId { get; init; } = string.Empty;
-    public string UserId { get; init; } = string.Empty;
-    public string RecipientName { get; init; } = string.Empty;
-    public decimal Amount { get; init; }
-    public string Currency { get; init; } = string.Empty;
-    public string Corridor { get; init; } = string.Empty;
-    public TransactionStatus CurrentStatus { get; init; }
-    public bool IsPaused { get; init; }
-    public DateTimeOffset CreatedAt { get; init; }
-    public DateTimeOffset UpdatedAt { get; init; }
-    public CreditGateway? CreditGateway { get; init; }
-    public string? RemitterPartner { get; init; }
-}
+[JsonDerivedType(typeof(TransactionInitiatedEvent), typeDiscriminator: "TransactionInitiatedEvent")]
+[JsonDerivedType(typeof(TransactionCreditCompletedEvent), typeDiscriminator: "TransactionCreditCompletedEvent")]
+[JsonDerivedType(typeof(TransactionCreditFailedEvent), typeDiscriminator: "TransactionCreditFailedEvent")]
+[JsonDerivedType(typeof(TransactionCreditFailedRetryEvent), typeDiscriminator: "TransactionCreditFailedRetryEvent")]
+[JsonDerivedType(typeof(TransactionCreditRetryRequestedEvent), typeDiscriminator: "TransactionCreditRetryRequestedEvent")]
+[JsonDerivedType(typeof(TransactionRegistrationCompletedEvent), typeDiscriminator: "TransactionRegistrationCompletedEvent")]
+[JsonDerivedType(typeof(TransactionRegistrationFailedRetryEvent), typeDiscriminator: "TransactionRegistrationFailedRetryEvent")]
+[JsonDerivedType(typeof(TransactionRegistrationRetryRequestedEvent), typeDiscriminator: "TransactionRegistrationRetryRequestedEvent")]
+[JsonDerivedType(typeof(TransactionPausedEvent), typeDiscriminator: "TransactionPausedEvent")]
+[JsonDerivedType(typeof(TransactionUnpausedEvent), typeDiscriminator: "TransactionUnpausedEvent")]
+public abstract record TransferEvent;
 
-public class TransactionStatusChanged : TransferEvent
-{
-    public string InternalRef { get; init; } = string.Empty;
-    public string TransactionId { get; init; } = string.Empty;
-    public TransactionStatus? FromStatus { get; init; }
-    public TransactionStatus ToStatus { get; init; }
-    public string Reason { get; init; } = string.Empty;
-    public bool IsPaused { get; init; }
-    public DateTimeOffset OccurredAt { get; init; }
-    public int? AttemptNumber { get; init; }
-    public string? FailureReason { get; init; }
-    public string? PartnerName { get; init; }
-}
+public sealed record TransactionInitiatedEvent(
+    string InternalRef,
+    string? PartnerRef,
+    string TransactionType,
+    string RemitterPartnerCode,
+    string PaymentPartner,
+    decimal CreditAmount,
+    string CreditAmountCurrency,
+    string ReceiverCardLast4,
+    DateTime OccurredOn) : TransferEvent;
+
+public sealed record TransactionCreditCompletedEvent(
+    string InternalRef,
+    int Attempt,
+    DateTime OccurredOn) : TransferEvent;
+
+public sealed record TransactionCreditFailedEvent(
+    string InternalRef,
+    string? PartnerRef,
+    int TotalAttempts,
+    string FailureReason,
+    DateTime OccurredOn) : TransferEvent;
+
+public sealed record TransactionCreditFailedRetryEvent(
+    string InternalRef,
+    int Attempt,
+    string FailureReason,
+    DateTime OccurredOn) : TransferEvent;
+
+public sealed record TransactionCreditRetryRequestedEvent(
+    string InternalRef,
+    DateTime OccurredOn) : TransferEvent;
+
+public sealed record TransactionRegistrationCompletedEvent(
+    string InternalRef,
+    string RemitterPartnerCode,
+    int Attempt,
+    DateTime OccurredOn) : TransferEvent;
+
+public sealed record TransactionRegistrationFailedRetryEvent(
+    string InternalRef,
+    string RemitterPartnerCode,
+    int Attempt,
+    DateTime NextAttemptAt,
+    string FailureReason,
+    DateTime OccurredOn) : TransferEvent;
+
+public sealed record TransactionRegistrationRetryRequestedEvent(
+    string InternalRef,
+    DateTime OccurredOn) : TransferEvent;
+
+public sealed record TransactionPausedEvent(
+    string InternalRef,
+    string Reason,
+    string? Details,
+    TransactionStatus StatusBeforePause,
+    DateTime OccurredOn) : TransferEvent;
+
+public sealed record TransactionUnpausedEvent(
+    string InternalRef,
+    TransactionStatus ResumedToStatus,
+    DateTime OccurredOn,
+    string? PausedTelegramMessageId = null) : TransferEvent;

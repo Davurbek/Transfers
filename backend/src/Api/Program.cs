@@ -12,6 +12,7 @@ using Universal.Transfers.Api.Messaging;
 using Universal.Transfers.Application;
 using Universal.Transfers.Application.Auth;
 using Universal.Transfers.Application.Messaging;
+using Universal.Transfers.Domain.Transactions.Enums;
 using Universal.Transfers.Infrastructure;
 using Universal.Transfers.Infrastructure.Common.Persistence;
 using Universal.Transfers.Infrastructure.Messaging.Kafka;
@@ -178,6 +179,26 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     await db.Database.EnsureCreatedAsync();
     await DbSeeder.SeedAsync(db, demoPassword);
+
+    if (app.Environment.IsDevelopment())
+    {
+        var logger = app.Services.GetRequiredService<ILogger<Program>>();
+        logger.LogInformation("Seeding sample transactions via EventProjector for development...");
+        var projector = scope.ServiceProvider.GetRequiredService<IEventProjector>();
+        var t = DateTime.UtcNow.AddDays(-7);
+        await projector.ProjectAsync(new TransactionInitiatedEvent("TX-SEED-001", null, "CREDIT", "PARTNER_A", "PAYME", 500000, "USD", "1234", t), default);
+        await projector.ProjectAsync(new TransactionCreditCompletedEvent("TX-SEED-001", 1, t.AddSeconds(1)), default);
+        await projector.ProjectAsync(new TransactionRegistrationCompletedEvent("TX-SEED-001", "PARTNER_A", 1, t.AddSeconds(2)), default);
+        await projector.ProjectAsync(new TransactionInitiatedEvent("TX-SEED-002", null, "CREDIT", "PARTNER_B", "PAYME", 1200000, "USD", "5678", t.AddHours(1)), default);
+        await projector.ProjectAsync(new TransactionCreditCompletedEvent("TX-SEED-002", 1, t.AddHours(1).AddSeconds(1)), default);
+        await projector.ProjectAsync(new TransactionInitiatedEvent("TX-SEED-003", null, "CREDIT", "PARTNER_A", "HUMO", 75000, "EUR", "9012", t.AddHours(2)), default);
+        await projector.ProjectAsync(new TransactionPausedEvent("TX-SEED-003", "Manual review", null, TransactionStatus.ConfirmSucceeded, t.AddHours(2).AddSeconds(1)), default);
+        await projector.ProjectAsync(new TransactionInitiatedEvent("TX-SEED-004", null, "CREDIT", "PARTNER_C", "PAYME", 300000, "GBP", "3456", t.AddHours(3)), default);
+        await projector.ProjectAsync(new TransactionCreditCompletedEvent("TX-SEED-004", 1, t.AddHours(3).AddSeconds(1)), default);
+        await projector.ProjectAsync(new TransactionRegistrationFailedRetryEvent("TX-SEED-004", "PARTNER_C", 1, t.AddHours(3).AddSeconds(10), "INVALID_PARTNER", t.AddHours(3).AddSeconds(2)), default);
+        await projector.ProjectAsync(new TransactionRegistrationRetryRequestedEvent("TX-SEED-004", t.AddHours(3).AddSeconds(3)), default);
+        logger.LogInformation("Sample transactions seeded successfully (idempotent - skipped if already exist)");
+    }
 }
 
 if (app.Environment.IsDevelopment())

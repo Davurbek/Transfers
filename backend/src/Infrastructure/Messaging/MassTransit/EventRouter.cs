@@ -1,6 +1,5 @@
 using Universal.Transfers.Application.Messaging;
 using Universal.Transfers.Domain.Transactions.Enums;
-using static Universal.Transfers.Domain.Transactions.Enums.TransactionStatus;
 
 namespace Universal.Transfers.Infrastructure.Messaging.MassTransit;
 
@@ -8,218 +7,123 @@ public static class EventRouter
 {
     public static TransferEvent? Route(object @event) => @event switch
     {
-        // ── TransactionInitiatedEvent → TransactionUpserted ──────────────────
-        ApiV2.TransactionInitiatedEvent e => new TransactionUpserted
-        {
-            InternalRef = e.InternalRef,
-            TransactionId = e.InternalRef,
-            RecipientName = e.ReceiverCardLast4,
-            Amount = e.CreditAmount,
-            Currency = e.CreditAmountCurrency,
-            Corridor = MapCorridor((ApiV2.RemitterPartner)e.RemitterPartner),
-            CurrentStatus = ConfirmSucceeded,
-            IsPaused = false,
-            CreatedAt = e.OccurredOn,
-            UpdatedAt = e.OccurredOn,
-            CreditGateway = e.PaymentPartner switch
-            {
-                1 => CreditGateway.Uzcard,
-                2 => CreditGateway.Humo,
-                _ => CreditGateway.Humo,
-            },
-            RemitterPartner = ((ApiV2.RemitterPartner)e.RemitterPartner).ToString(),
-        },
+        // ── Direct mapping to our new dashboard event types ──────────────────
+        TransactionInitiatedEvent e => e,
+        TransactionCreditCompletedEvent e => e,
+        TransactionCreditFailedEvent e => e,
+        TransactionCreditFailedRetryEvent e => e,
+        TransactionCreditRetryRequestedEvent e => e,
+        TransactionRegistrationCompletedEvent e => e,
+        TransactionRegistrationFailedRetryEvent e => e,
+        TransactionRegistrationRetryRequestedEvent e => e,
+        TransactionPausedEvent e => e,
+        TransactionUnpausedEvent e => e,
 
-        // ── TransactionCreditCompletedEvent → status: CreditSucceeded ────────
-        ApiV2.TransactionCreditCompletedEvent e => NewStatus(e.InternalRef, e.OccurredOn, CreditSucceeded,
-            $"Credit completed (attempt {e.Attempt})", attemptNumber: e.Attempt),
+        // ── ApiV2 events (from MassTransit Kafka rider) ─────────────────────
+        ApiV2.TransactionInitiatedEvent e => new TransactionInitiatedEvent(
+            e.InternalRef, e.PartnerRef, "standard", e.RemitterPartner.ToString(),
+            e.PaymentPartner.ToString(), e.CreditAmount, e.CreditAmountCurrency,
+            e.ReceiverCardLast4, e.OccurredOn),
 
-        // ── TransactionCreditFailedEvent → status: CreditFailed ──────────────
-        ApiV2.TransactionCreditFailedEvent e => NewStatus(e.InternalRef, e.OccurredOn, CreditFailed,
-            $"Credit terminally failed: {e.FailureReason}", attemptNumber: e.TotalAttempts, failureReason: e.FailureReason),
+        ApiV2.TransactionCreditCompletedEvent e =>
+            new TransactionCreditCompletedEvent(e.InternalRef, e.Attempt, e.OccurredOn),
 
-        // ── TransactionCreditFailedRetryEvent → status: CreditFailedRetry ────
-        ApiV2.TransactionCreditFailedRetryEvent e => NewStatus(e.InternalRef, e.OccurredOn, CreditFailedRetry,
-            $"Credit failed (attempt {e.Attempt}): {e.FailureReason}", attemptNumber: e.Attempt, failureReason: e.FailureReason),
+        ApiV2.TransactionCreditFailedEvent e =>
+            new TransactionCreditFailedEvent(e.InternalRef, e.PartnerRef,
+                e.TotalAttempts, e.FailureReason, e.OccurredOn),
 
-        // ── TransactionCreditRetryRequestedEvent → status: CreditFailedRetry ─
-        ApiV2.TransactionCreditRetryRequestedEvent e => NewStatus(e.InternalRef, e.OccurredOn, CreditFailedRetry,
-            "Credit retry requested after unpause"),
+        ApiV2.TransactionCreditFailedRetryEvent e =>
+            new TransactionCreditFailedRetryEvent(e.InternalRef, e.Attempt,
+                e.FailureReason, e.OccurredOn),
 
-        // ── TransactionRegistrationCompletedEvent → status: RegistrationSucceeded ─
-        ApiV2.TransactionRegistrationCompletedEvent e => NewStatus(e.InternalRef, e.OccurredOn, RegistrationSucceeded,
-            $"Registration completed (attempt {e.Attempt})", attemptNumber: e.Attempt,
-            partnerName: ((ApiV2.RemitterPartner)e.RemitterPartner).ToString()),
+        ApiV2.TransactionCreditRetryRequestedEvent e =>
+            new TransactionCreditRetryRequestedEvent(e.InternalRef, e.OccurredOn),
 
-        // ── TransactionRegistrationFailedRetryEvent → status: RegistrationFailedRetry ─
-        ApiV2.TransactionRegistrationFailedRetryEvent e => NewStatus(e.InternalRef, e.OccurredOn, RegistrationFailedRetry,
-            $"Registration failed (attempt {e.Attempt}): {e.FailureReason}", attemptNumber: e.Attempt,
-            failureReason: e.FailureReason, partnerName: ((ApiV2.RemitterPartner)e.RemitterPartner).ToString()),
+        ApiV2.TransactionRegistrationCompletedEvent e =>
+            new TransactionRegistrationCompletedEvent(e.InternalRef,
+                e.RemitterPartner.ToString(), e.Attempt, e.OccurredOn),
 
-        // ── TransactionRegistrationRetryRequestedEvent → status: RegistrationFailedRetry ─
-        ApiV2.TransactionRegistrationRetryRequestedEvent e => NewStatus(e.InternalRef, e.OccurredOn, RegistrationFailedRetry,
-            "Registration retry requested after unpause"),
+        ApiV2.TransactionRegistrationFailedRetryEvent e =>
+            new TransactionRegistrationFailedRetryEvent(e.InternalRef,
+                e.RemitterPartner.ToString(), e.Attempt, e.NextAttemptAt,
+                e.FailureReason, e.OccurredOn),
 
-        // ── TransactionPausedEvent → status: Paused ─────────────────────────
-        ApiV2.TransactionPausedEvent e => new TransactionStatusChanged
-        {
-            InternalRef = e.InternalRef,
-            TransactionId = e.InternalRef,
-            FromStatus = ToDashboard(e.StatusBeforePause),
-            ToStatus = Paused,
-            Reason = $"Transaction paused: {e.Details ?? e.Reason.ToString()}",
-            IsPaused = true,
-            OccurredAt = e.OccurredOn,
-        },
+        ApiV2.TransactionRegistrationRetryRequestedEvent e =>
+            new TransactionRegistrationRetryRequestedEvent(e.InternalRef, e.OccurredOn),
 
-        // ── TransactionUnpausedEvent → status: ResumedToStatus ──────────────
-        ApiV2.TransactionUnpausedEvent e => NewStatus(e.InternalRef, e.OccurredOn, ToDashboard(e.ResumedToStatus),
-            $"Transaction unpaused, resumed to {e.ResumedToStatus}", isPaused: false),
+        ApiV2.TransactionPausedEvent e =>
+            new TransactionPausedEvent(e.InternalRef, e.Reason.ToString(),
+                e.Details, ToDashboard(e.StatusBeforePause), e.OccurredOn),
+
+        ApiV2.TransactionUnpausedEvent e =>
+            new TransactionUnpausedEvent(e.InternalRef,
+                ToDashboard(e.ResumedToStatus), e.OccurredOn),
 
         _ => null,
     };
 
-    private static TransactionStatusChanged NewStatus(string internalRef, DateTime occurredOn, TransactionStatus toStatus,
-        string reason, bool isPaused = false, int? attemptNumber = null, string? failureReason = null,
-        string? partnerName = null) => new()
-    {
-        InternalRef = internalRef,
-        TransactionId = internalRef,
-        FromStatus = null,
-        ToStatus = toStatus,
-        Reason = reason,
-        IsPaused = isPaused,
-        OccurredAt = occurredOn,
-        AttemptNumber = attemptNumber,
-        FailureReason = failureReason,
-        PartnerName = partnerName,
-    };
-
     private static TransactionStatus ToDashboard(ApiV2.TransactionStatus s) => s switch
     {
-        ApiV2.TransactionStatus.ConfirmPending => ConfirmPending,
-        ApiV2.TransactionStatus.ConfirmExpired => ConfirmExpired,
-        ApiV2.TransactionStatus.ConfirmFailed => ConfirmFailed,
-        ApiV2.TransactionStatus.ConfirmSucceeded => ConfirmSucceeded,
-        ApiV2.TransactionStatus.CreditSucceeded => CreditSucceeded,
-        ApiV2.TransactionStatus.CreditFailedRetry => CreditFailedRetry,
-        ApiV2.TransactionStatus.CreditFailed => CreditFailed,
-        ApiV2.TransactionStatus.RegistrationFailedRetry => RegistrationFailedRetry,
-        ApiV2.TransactionStatus.RegistrationSucceeded => RegistrationSucceeded,
-        ApiV2.TransactionStatus.Paused => Paused,
-        _ => Paused,
+        ApiV2.TransactionStatus.ConfirmPending => TransactionStatus.ConfirmPending,
+        ApiV2.TransactionStatus.ConfirmExpired => TransactionStatus.ConfirmExpired,
+        ApiV2.TransactionStatus.ConfirmFailed => TransactionStatus.ConfirmFailed,
+        ApiV2.TransactionStatus.ConfirmSucceeded => TransactionStatus.ConfirmSucceeded,
+        ApiV2.TransactionStatus.CreditSucceeded => TransactionStatus.CreditSucceeded,
+        ApiV2.TransactionStatus.CreditFailedRetry => TransactionStatus.CreditFailedRetry,
+        ApiV2.TransactionStatus.CreditFailed => TransactionStatus.CreditFailed,
+        ApiV2.TransactionStatus.RegistrationFailedRetry => TransactionStatus.RegistrationFailedRetry,
+        ApiV2.TransactionStatus.RegistrationSucceeded => TransactionStatus.RegistrationSucceeded,
+        ApiV2.TransactionStatus.Paused => TransactionStatus.Paused,
+        _ => TransactionStatus.Paused,
     };
 
-    private static string MapCorridor(ApiV2.RemitterPartner partner) => partner switch
-    {
-        ApiV2.RemitterPartner.Tinkoff => "RU->UZ",
-        ApiV2.RemitterPartner.Profee => "RU->UZ",
-        ApiV2.RemitterPartner.Gazprom => "RU->UZ",
-        ApiV2.RemitterPartner.Unlimited => "US->UZ",
-        ApiV2.RemitterPartner.MoneyGram => "US->UZ",
-        _ => "XX->UZ",
-    };
-
-    // ── ApiV2 event types consumed from Kafka ──────────────────────────────
     public static class ApiV2
     {
         public enum TransactionStatus
         {
-            ConfirmPending = 1,
-            ConfirmExpired = 2,
-            ConfirmFailed = 3,
-            ConfirmSucceeded = 4,
-            CreditSucceeded = 5,
-            CreditFailedRetry = 6,
-            CreditFailed = 7,
-            RegistrationFailedRetry = 8,
-            RegistrationSucceeded = 10,
-            Paused = 11,
+            ConfirmPending = 1, ConfirmExpired = 2, ConfirmFailed = 3,
+            ConfirmSucceeded = 4, CreditSucceeded = 5, CreditFailedRetry = 6,
+            CreditFailed = 7, RegistrationFailedRetry = 8,
+            RegistrationSucceeded = 10, Paused = 11,
         }
 
-        public enum TransactionPauseReason
-        {
-            CreditFailure = 1,
-            RegistrationFailure = 2,
-            Other = 3,
-        }
-
-        public enum PaymentPartner
-        {
-            Uzcard = 1,
-            Humo = 2,
-        }
-
-        public enum RemitterPartner
-        {
-            Tinkoff = 1,
-            Profee = 2,
-            Gazprom = 3,
-            Unlimited = 4,
-            MoneyGram = 5,
-        }
+        public enum TransactionPauseReason { CreditFailure = 1, RegistrationFailure = 2, Other = 3, }
+        public enum PaymentPartner { Uzcard = 1, Humo = 2, }
+        public enum RemitterPartner { Tinkoff = 1, Profee = 2, Gazprom = 3, Unlimited = 4, MoneyGram = 5, }
 
         public sealed record TransactionInitiatedEvent(
-            string InternalRef,
-            string? PartnerRef,
-            int TransactionType,
-            int RemitterPartner,
-            int PaymentPartner,
-            decimal CreditAmount,
-            string CreditAmountCurrency,
-            string ReceiverCardLast4,
-            DateTime OccurredOn);
+            string InternalRef, string? PartnerRef, int TransactionType,
+            int RemitterPartner, int PaymentPartner, decimal CreditAmount,
+            string CreditAmountCurrency, string ReceiverCardLast4, DateTime OccurredOn);
 
         public sealed record TransactionCreditCompletedEvent(
-            string InternalRef,
-            int Attempt,
-            DateTime OccurredOn);
+            string InternalRef, int Attempt, DateTime OccurredOn);
 
         public sealed record TransactionCreditFailedEvent(
-            string InternalRef,
-            string? PartnerRef,
-            int TotalAttempts,
-            string FailureReason,
-            DateTime OccurredOn);
+            string InternalRef, string? PartnerRef, int TotalAttempts,
+            string FailureReason, DateTime OccurredOn);
 
         public sealed record TransactionCreditFailedRetryEvent(
-            string InternalRef,
-            int Attempt,
-            string FailureReason,
-            DateTime OccurredOn);
+            string InternalRef, int Attempt, string FailureReason, DateTime OccurredOn);
 
         public sealed record TransactionCreditRetryRequestedEvent(
-            string InternalRef,
-            DateTime OccurredOn);
+            string InternalRef, DateTime OccurredOn);
 
         public sealed record TransactionRegistrationCompletedEvent(
-            string InternalRef,
-            int RemitterPartner,
-            int Attempt,
-            DateTime OccurredOn);
+            string InternalRef, int RemitterPartner, int Attempt, DateTime OccurredOn);
 
         public sealed record TransactionRegistrationFailedRetryEvent(
-            string InternalRef,
-            int RemitterPartner,
-            int Attempt,
-            DateTime NextAttemptAt,
-            string FailureReason,
-            DateTime OccurredOn);
+            string InternalRef, int RemitterPartner, int Attempt,
+            DateTime NextAttemptAt, string FailureReason, DateTime OccurredOn);
 
         public sealed record TransactionRegistrationRetryRequestedEvent(
-            string InternalRef,
-            DateTime OccurredOn);
+            string InternalRef, DateTime OccurredOn);
 
         public sealed record TransactionPausedEvent(
-            string InternalRef,
-            TransactionPauseReason Reason,
-            string? Details,
-            TransactionStatus StatusBeforePause,
-            DateTime OccurredOn);
+            string InternalRef, TransactionPauseReason Reason, string? Details,
+            TransactionStatus StatusBeforePause, DateTime OccurredOn);
 
         public sealed record TransactionUnpausedEvent(
-            string InternalRef,
-            TransactionStatus ResumedToStatus,
-            DateTime OccurredOn);
+            string InternalRef, TransactionStatus ResumedToStatus, DateTime OccurredOn);
     }
 }

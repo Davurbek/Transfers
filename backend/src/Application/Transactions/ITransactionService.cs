@@ -13,5 +13,5 @@ public interface ITransactionService
 
     Task<TransactionDetailDto?> GetDetailAsync(string transactionId, CancellationToken ct = default);
 
-    Task<UnpauseResult> UnpauseAsync(string transactionId, Guid userId, string username, string ipAddress, CancellationToken ct = default);
+    Task<UnpauseResult> UnpauseAsync(string internalRef, Guid userId, string username, string ipAddress, CancellationToken ct = default);
 }

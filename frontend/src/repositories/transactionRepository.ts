@@ -22,9 +22,9 @@ export class TransactionRepository implements ITransactionRepository {
     return data
   }
 
-  async unpause(transactionId: string): Promise<ActionAcceptedResponse> {
+  async unpause(internalRef: string): Promise<ActionAcceptedResponse> {
     const { data } = await this.http.post<ActionAcceptedResponse>(
-      `/transactions/${transactionId}/unpause`,
+      `/transactions/${internalRef}/unpause`,
     )
     return data
   }

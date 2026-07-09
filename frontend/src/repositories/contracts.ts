@@ -29,7 +29,7 @@ export interface IAuthRepository {
 export interface ITransactionRepository {
   search(query: TransactionQuery): Promise<PagedResult<TransactionSummary>>
   getDetail(transactionId: string): Promise<TransactionDetail>
-  unpause(transactionId: string): Promise<ActionAcceptedResponse>
+  unpause(internalRef: string): Promise<ActionAcceptedResponse>
 }
 
 export interface IAuditRepository {

@@ -39,19 +39,19 @@ public class TransactionsController(ITransactionService transactionService) : Co
     }
 
     [Authorize(Policy = "permission:tx:unpause")]
-    [HttpPost("{id}/unpause")]
+    [HttpPost("{internalRef}/unpause")]
     [EnableRateLimiting("mutations")]
-    public async Task<IActionResult> Unpause(string id, CancellationToken ct)
+    public async Task<IActionResult> Unpause(string internalRef, CancellationToken ct)
     {
         var userId = HttpContext.User.GetUserId();
         var username = HttpContext.User.Identity?.Name ?? "unknown";
         var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "0.0.0.0";
 
-        var result = await transactionService.UnpauseAsync(id, userId, username, ip, ct);
+        var result = await transactionService.UnpauseAsync(internalRef, userId, username, ip, ct);
 
         return result.Outcome switch
         {
-            UnpauseOutcome.Accepted => Accepted(new { message = "Unpause command accepted", transactionId = id, commandId = result.CommandId }),
+            UnpauseOutcome.Accepted => Accepted(new { message = "Unpause command accepted", internalRef, commandId = result.CommandId }),
             UnpauseOutcome.NotFound => NotFound(new { message = "Transaction not found" }),
             UnpauseOutcome.NotPaused => BadRequest(new { message = "Transaction is not paused" }),
             _ => StatusCode(500),
