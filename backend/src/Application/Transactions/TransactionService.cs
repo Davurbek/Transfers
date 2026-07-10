@@ -1,11 +1,11 @@
-using Universal.Transfers.Domain.Common;
-using Universal.Transfers.Domain.Transactions.Interfaces;
-using Universal.Transfers.Domain.Audit.Interfaces;
-using Universal.Transfers.Domain.Audit.Entities;
+using Microsoft.Extensions.Logging;
+using Universal.Transfers.Application.Messaging;
 using Universal.Transfers.Application.Transactions.DTOs;
 using Universal.Transfers.Application.Transactions.Mappings;
-using Universal.Transfers.Application.Messaging;
-using Microsoft.Extensions.Logging;
+using Universal.Transfers.Domain.Audit.Entities;
+using Universal.Transfers.Domain.Audit.Interfaces;
+using Universal.Transfers.Domain.Common;
+using Universal.Transfers.Domain.Transactions.Interfaces;
 
 namespace Universal.Transfers.Application.Transactions;
 
@@ -58,7 +58,7 @@ public class TransactionService(
         if (!tx.IsPaused || tx.CurrentStatus != Domain.Transactions.Enums.TransactionStatus.Paused)
             return new UnpauseResult(UnpauseOutcome.NotPaused, null);
 
-        var command = new UnpauseTransactionCommand(internalRef, username);
+        var command = new TransactionUnpauseRequestedEvent(internalRef, username);
         await commandPublisher.PublishAsync(command, ct);
 
         var audit = new AuditLog

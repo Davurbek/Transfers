@@ -114,7 +114,7 @@ public sealed class KafkaCommandConsumer : BackgroundService
 
         if (commandTypeName.Contains("UnpauseTransactionCommand"))
         {
-            var command = JsonSerializer.Deserialize<UnpauseTransactionCommand>(result.Message.Value, DeserializeOpts);
+            var command = JsonSerializer.Deserialize<TransactionUnpauseRequestedEvent>(result.Message.Value, DeserializeOpts);
             if (command is null)
             {
                 _logger.LogError("Failed to deserialize UnpauseTransactionCommand from key {Key}", result.Message.Key);
@@ -133,7 +133,7 @@ public sealed class KafkaCommandConsumer : BackgroundService
         }
     }
 
-    private async Task ProcessUnpauseCommandAsync(UnpauseTransactionCommand command, CancellationToken ct)
+    private async Task ProcessUnpauseCommandAsync(TransactionUnpauseRequestedEvent command, CancellationToken ct)
     {
         _logger.LogInformation(
             "Processing UnpauseTransactionCommand for transaction {InternalRef} by user {User}",

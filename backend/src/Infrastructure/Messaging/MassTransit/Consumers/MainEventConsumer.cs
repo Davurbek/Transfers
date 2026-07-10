@@ -53,7 +53,6 @@ public sealed class MainEventConsumer(
         TransactionRegistrationRetryRequestedEvent e => e.InternalRef,
         TransactionPausedEvent e => e.InternalRef,
         TransactionUnpausedEvent e => e.InternalRef,
-        TransactionUnpauseRequestedEvent e => e.InternalRef,
         _ => "unknown",
     };
 }

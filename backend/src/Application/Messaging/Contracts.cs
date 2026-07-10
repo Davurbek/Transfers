@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Universal.Transfers.Domain.PaymentPartners.Enums;
@@ -6,9 +5,9 @@ using Universal.Transfers.Domain.Transactions.Enums;
 
 namespace Universal.Transfers.Application.Messaging;
 
-[JsonDerivedType(typeof(UnpauseTransactionCommand), typeDiscriminator: "UnpauseTransactionCommand")]
+[JsonDerivedType(typeof(TransactionUnpauseRequestedEvent), typeDiscriminator: "TransactionUnpauseRequestedEvent")]
 public abstract record TransferCommand(string CommandId, string IssuedByUser);
-public record UnpauseTransactionCommand(string InternalRef, string IssuedByUser) : TransferCommand(Guid.NewGuid().ToString(), IssuedByUser);
+public record TransactionUnpauseRequestedEvent(string InternalRef, string IssuedByUser) : TransferCommand(Guid.NewGuid().ToString(), IssuedByUser);
 
 [JsonDerivedType(typeof(TransactionInitiatedEvent), typeDiscriminator: "TransactionInitiatedEvent")]
 [JsonDerivedType(typeof(TransactionCreditCompletedEvent), typeDiscriminator: "TransactionCreditCompletedEvent")]
@@ -20,7 +19,6 @@ public record UnpauseTransactionCommand(string InternalRef, string IssuedByUser)
 [JsonDerivedType(typeof(TransactionRegistrationRetryRequestedEvent), typeDiscriminator: "TransactionRegistrationRetryRequestedEvent")]
 [JsonDerivedType(typeof(TransactionPausedEvent), typeDiscriminator: "TransactionPausedEvent")]
 [JsonDerivedType(typeof(TransactionUnpausedEvent), typeDiscriminator: "TransactionUnpausedEvent")]
-[JsonDerivedType(typeof(TransactionUnpauseRequestedEvent), typeDiscriminator: "TransactionUnpauseRequestedEvent")]
 public abstract record TransferEvent;
 
 public sealed record TransactionInitiatedEvent(
@@ -91,7 +89,3 @@ public sealed record TransactionUnpausedEvent(
     DateTime OccurredOn,
     string? PausedTelegramMessageId = null) : TransferEvent;
 
-public sealed record TransactionUnpauseRequestedEvent(
-    string InternalRef,
-    DateTime OccurredOn
-) : TransferEvent;

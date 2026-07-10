@@ -1,4 +1,3 @@
-using Microsoft.Extensions.Configuration;
 using System.Threading.Channels;
 using Universal.Transfers.Application.Messaging;
 using Universal.Transfers.Domain.Transactions.Enums;
@@ -50,7 +49,7 @@ public sealed class SimulatedBroker(
 
         switch (command)
         {
-            case UnpauseTransactionCommand unpause:
+            case TransactionUnpauseRequestedEvent unpause:
                 var txRef = unpause.InternalRef;
 
                 TransactionStatus resumeTo;

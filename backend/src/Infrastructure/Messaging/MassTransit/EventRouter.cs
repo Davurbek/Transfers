@@ -16,7 +16,6 @@ public static class EventRouter
         TransactionRegistrationRetryRequestedEvent e => e,
         TransactionPausedEvent e => e,
         TransactionUnpausedEvent e => e,
-        TransactionUnpauseRequestedEvent e => e,
         _ => null,
     };
 }
