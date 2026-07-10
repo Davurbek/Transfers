@@ -12,7 +12,15 @@ using Universal.Transfers.Infrastructure.Transactions.Messaging;
 using Universal.Transfers.Infrastructure.Audit.Persistence;
 using Universal.Transfers.Infrastructure.Inbox.Persistence;
 using Universal.Transfers.Application.Messaging;
+using Universal.Transfers.Domain.DeadLetter.Interfaces;
+using Universal.Transfers.Domain.Outbox.Interfaces;
+using Universal.Transfers.Infrastructure.DeadLetter.Persistence;
+using Universal.Transfers.Infrastructure.DeadLetter.Services;
 using Universal.Transfers.Infrastructure.Messaging.Kafka;
+using Universal.Transfers.Infrastructure.Outbox.Persistence;
+using Universal.Transfers.Infrastructure.Outbox.Services;
+using Universal.Transfers.Infrastructure.Common.Messaging.Eventing;
+using System.Reflection;
 
 namespace Universal.Transfers.Infrastructure;
 
@@ -22,11 +30,14 @@ public static class DependencyInjection
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        var connectionString = configuration.GetConnectionString("Dashboard")
-            ?? throw new InvalidOperationException("ConnectionStrings:Dashboard is not configured.");
+        var connectionString = configuration.GetConnectionString("DefaultConnection")
+            ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection is not configured.");
 
-        services.AddDbContext<AppDbContext>(opt => opt
-            .UseSqlServer(connectionString, sql => sql.CommandTimeout(120)));
+        services.AddDbContext<AppDbContext>(opt =>
+        {
+            opt.UseNpgsql(connectionString, npgsql => npgsql.CommandTimeout(120));
+            opt.AddInterceptors(new DomainEventInterceptor());
+        });
 
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
@@ -36,9 +47,13 @@ public static class DependencyInjection
         services.AddScoped<IAuditRepository, AuditRepository>();
 
         services.AddScoped<IProcessedMessageRepository, ProcessedMessageRepository>();
-        services.AddScoped<IInboxEventRepository, InboxEventRepository>();
+        services.AddScoped<IOutboxMessageRepository, OutboxMessageRepository>();
+        services.AddScoped<IDeadLetterRepository, DeadLetterRepository>();
+        services.AddScoped<DeadLetterService>();
 
         services.AddScoped<IEventProjector, EventProjector>();
+
+        services.AddOutboxMappers();
 
         return services;
     }
@@ -49,10 +64,33 @@ public static class DependencyInjection
     {
         services.Configure<KafkaOptions>(configuration.GetSection(KafkaOptions.SectionName));
 
-        services.AddSingleton<ICommandPublisher, KafkaCommandPublisher>();
+        services.AddHostedService<OutboxPublisher>();
+        services.AddHostedService<DeadLetterReplayService>();
         services.AddHostedService<KafkaEventConsumer>();
         services.AddHostedService<KafkaCommandConsumer>();
-        services.AddHostedService<InboxEventProcessor>();
+
+        return services;
+    }
+
+    private static IServiceCollection AddOutboxMappers(this IServiceCollection services)
+    {
+        var mapperType = typeof(IDomainEventOutboxMapper<>);
+        var assembly = Assembly.GetExecutingAssembly();
+
+        foreach (var type in assembly.GetTypes())
+        {
+            if (type.IsAbstract || type.IsInterface)
+                continue;
+
+            var interfaces = type.GetInterfaces()
+                .Where(i => i.IsGenericType && i.GetGenericTypeDefinition() == mapperType)
+                .ToList();
+
+            foreach (var iface in interfaces)
+            {
+                services.AddScoped(iface, type);
+            }
+        }
 
         return services;
     }

@@ -20,9 +20,9 @@ try
     log.Info("║   E2E: EventProjector + Unpause         ║");
     log.Info("╚══════════════════════════════════════════╝");
 
-    // ── 1. Real SQL Server database ──────────────────
-    var conn = "Server=DAVRBEK\\MSSQLSERVER03;Database=Transfer_E2E_Test;Integrated Security=True;MultipleActiveResultSets=true;Encrypt=False;TrustServerCertificate=True";
-    var opts = new DbContextOptionsBuilder<AppDbContext>().UseSqlServer(conn).Options;
+    // ── 1. Real PostgreSQL database ──────────────────
+    var conn = "Host=localhost;Database=Transfer_E2E_Test;Username=postgres";
+    var opts = new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(conn).Options;
     var db = new AppDbContext(opts);
     await db.Database.EnsureDeletedAsync();
     await db.Database.EnsureCreatedAsync();

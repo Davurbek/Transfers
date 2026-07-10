@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using System.Text.Json;
 using Universal.Transfers.Application.Messaging;
 using Universal.Transfers.Domain.Transactions.Entities;
 using Universal.Transfers.Domain.Transactions.Enums;
@@ -98,6 +99,8 @@ public class EventProjector(
             return;
         }
 
+        var (amount, currency) = ResolveAmountAndCurrency(e);
+
         tx = new Transaction
         {
             InternalRef = e.InternalRef,
@@ -105,21 +108,79 @@ public class EventProjector(
             TransactionId = e.InternalRef,
             UserId = string.Empty,
             RecipientName = e.ReceiverCardLast4,
-            Amount = e.CreditAmount,
-            Currency = e.CreditAmountCurrency,
-            Corridor = e.TransactionType,
+            Amount = amount,
+            Currency = currency,
+            Corridor = e.TransactionType.ToString(),
             CurrentStatus = TransactionStatus.ConfirmSucceeded,
             IsPaused = false,
             CreatedAt = new DateTimeOffset(e.OccurredOn, TimeSpan.Zero),
             UpdatedAt = new DateTimeOffset(e.OccurredOn, TimeSpan.Zero),
             RemitterPartner = e.RemitterPartnerCode,
-            PaymentPartner = e.PaymentPartner,
+            PaymentPartner = e.PaymentPartner.ToString(),
         };
         await txRepo.AddAsync(tx, ct);
 
         AppendInitStatusHistory(tx, e.OccurredOn);
         await txRepo.SaveChangesAsync(ct);
-        logger.LogInformation("Projected TransactionInitiatedEvent for {InternalRef}", e.InternalRef);
+        logger.LogInformation("Projected TransactionInitiatedEvent for {InternalRef} | Amount={Amount} {Currency}", e.InternalRef, amount, currency);
+    }
+
+    private static (decimal amount, string currency) ResolveAmountAndCurrency(TransactionInitiatedEvent e)
+    {
+        var amount = e.CreditAmount;
+        var currency = e.CreditAmountCurrency ?? string.Empty;
+
+        if (amount != 0m && !string.IsNullOrWhiteSpace(currency))
+            return (amount, currency);
+
+        if (e.ExtensionData is null)
+            return (amount, currency);
+
+        if (amount == 0m)
+        {
+            if (TryGetDecimal(e.ExtensionData, "amount", out var v)) amount = v;
+            else if (TryGetDecimal(e.ExtensionData, "credit_amount", out v)) amount = v;
+            else if (TryGetDecimal(e.ExtensionData, "sum", out v)) amount = v;
+            else if (TryGetDecimal(e.ExtensionData, "creditAmount", out v)) amount = v;
+        }
+
+        if (string.IsNullOrWhiteSpace(currency))
+        {
+            if (TryGetString(e.ExtensionData, "currency", out var c)) currency = c!;
+            else if (TryGetString(e.ExtensionData, "creditAmountCurrency", out c)) currency = c!;
+            else if (TryGetString(e.ExtensionData, "credit_amount_currency", out c)) currency = c!;
+            else if (TryGetString(e.ExtensionData, "currencyCode", out c)) currency = c!;
+        }
+
+        return (amount, currency);
+    }
+
+    private static bool TryGetDecimal(Dictionary<string, JsonElement> ext, string key, out decimal value)
+    {
+        value = 0m;
+        if (!ext.TryGetValue(key, out var el) || el.ValueKind == JsonValueKind.Null)
+            return false;
+        try
+        {
+            value = el.ValueKind == JsonValueKind.String
+                ? decimal.Parse(el.GetString()!)
+                : el.GetDecimal();
+            return true;
+        }
+        catch { return false; }
+    }
+
+    private static bool TryGetString(Dictionary<string, JsonElement> ext, string key, out string? value)
+    {
+        value = null;
+        if (!ext.TryGetValue(key, out var el) || el.ValueKind == JsonValueKind.Null)
+            return false;
+        try
+        {
+            value = el.GetString();
+            return !string.IsNullOrWhiteSpace(value);
+        }
+        catch { return false; }
     }
 
     private static void AppendInitStatusHistory(Transaction tx, DateTime occurredOn)

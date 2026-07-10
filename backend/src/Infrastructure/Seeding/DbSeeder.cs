@@ -24,18 +24,10 @@ public static class DbSeeder
             await SeedAuditAsync(db);
     }
 
-    private static async Task MigrateSchemaAsync(AppDbContext db)
+    private static Task MigrateSchemaAsync(AppDbContext db)
     {
-        await using var cmd = db.Database.GetDbConnection().CreateCommand();
-        cmd.CommandText = @"
-            IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('Transactions') AND name = 'InternalRef')
-                ALTER TABLE Transactions ADD InternalRef NVARCHAR(MAX) NOT NULL DEFAULT '';
-            IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('Transactions') AND name = 'IsPaused')
-                ALTER TABLE Transactions ADD IsPaused BIT NOT NULL DEFAULT 0;
-        ";
-        if (cmd.Connection!.State != System.Data.ConnectionState.Open)
-            await cmd.Connection.OpenAsync();
-        await cmd.ExecuteNonQueryAsync();
+        // Schema is fully managed by EF Core EnsureCreatedAsync — no manual migration needed.
+        return Task.CompletedTask;
     }
 
     private static async Task SeedAuthAsync(AppDbContext db, string demoPassword)

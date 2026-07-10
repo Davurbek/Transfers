@@ -18,7 +18,6 @@ public sealed class MassTransitOptions
     public int ConcurrentMessageLimit { get; init; } = 5;
 
     public RetryPolicy Retry { get; init; } = new();
-    public Dictionary<string, string> Topics { get; init; } = [];
 
     public sealed class RetryPolicy
     {

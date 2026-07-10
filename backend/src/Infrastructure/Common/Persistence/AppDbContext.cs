@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using Universal.Transfers.Domain.Audit.Entities;
 using Universal.Transfers.Domain.Auth.Entities;
+using Universal.Transfers.Domain.DeadLetter.Entities;
 using Universal.Transfers.Domain.Inbox.Entities;
+using Universal.Transfers.Domain.Outbox.Entities;
 using Universal.Transfers.Domain.Transactions.Entities;
 
 namespace Universal.Transfers.Infrastructure.Common.Persistence;
@@ -23,7 +25,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<ProcessedMessage> ProcessedMessages => Set<ProcessedMessage>();
-    public DbSet<InboxEvent> InboxEvents => Set<InboxEvent>();
+    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+    public DbSet<DeadLetterMessage> DeadLetterMessages => Set<DeadLetterMessage>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -78,7 +81,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
         b.Entity<Transaction>(e =>
         {
-            e.HasIndex(x => x.InternalRef).IsUnique().HasFilter("[InternalRef] IS NOT NULL AND [InternalRef] <> ''");
+            e.HasIndex(x => x.InternalRef).IsUnique().HasFilter("\"InternalRef\" IS NOT NULL AND \"InternalRef\" <> ''");
             e.HasIndex(x => x.TransactionId).IsUnique();
             e.HasIndex(x => x.UserId);
             e.HasIndex(x => x.CreatedAt);
@@ -98,7 +101,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         {
             e.HasIndex(x => x.TransactionId);
             e.HasIndex(x => x.OccurredAt);
-            e.HasIndex(x => x.EventId).IsUnique().HasFilter("[EventId] IS NOT NULL");
+            e.HasIndex(x => x.EventId).IsUnique().HasFilter("\"EventId\" IS NOT NULL");
             e.Property(x => x.FromStatus).HasConversion<string>();
             e.Property(x => x.ToStatus).HasConversion<string>();
             e.HasOne(x => x.Transaction).WithMany(t => t.StatusHistory).HasForeignKey(x => x.TransactionId);
@@ -108,7 +111,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         {
             e.HasIndex(x => x.TransactionId);
             e.HasIndex(x => x.AttemptedAt);
-            e.HasIndex(x => x.EventId).IsUnique().HasFilter("[EventId] IS NOT NULL");
+            e.HasIndex(x => x.EventId).IsUnique().HasFilter("\"EventId\" IS NOT NULL");
             e.Property(x => x.Gateway).HasConversion<string>();
             e.Property(x => x.Status).HasConversion<string>();
             e.HasOne(x => x.Transaction).WithMany(t => t.CreditAttempts).HasForeignKey(x => x.TransactionId);
@@ -118,7 +121,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         {
             e.HasIndex(x => x.TransactionId);
             e.HasIndex(x => x.RegisteredAt);
-            e.HasIndex(x => x.EventId).IsUnique().HasFilter("[EventId] IS NOT NULL");
+            e.HasIndex(x => x.EventId).IsUnique().HasFilter("\"EventId\" IS NOT NULL");
             e.Property(x => x.Status).HasConversion<string>();
             e.HasOne(x => x.Transaction).WithMany(t => t.PartnerRegistrations).HasForeignKey(x => x.TransactionId);
         });
@@ -132,6 +135,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         });
 
         b.ApplyConfiguration(new Inbox.Persistence.Configurations.ProcessedMessageConfiguration());
-        b.ApplyConfiguration(new Inbox.Persistence.Configurations.InboxEventConfiguration());
+        b.ApplyConfiguration(new Outbox.Persistence.Configurations.OutboxMessageConfiguration());
+        b.ApplyConfiguration(new DeadLetter.Persistence.Configurations.DeadLetterConfiguration());
     }
 }

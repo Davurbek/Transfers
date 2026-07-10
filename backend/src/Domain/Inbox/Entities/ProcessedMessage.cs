@@ -11,14 +11,14 @@ public sealed class ProcessedMessage
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(idempotencyKey);
         ArgumentException.ThrowIfNullOrWhiteSpace(eventType);
-        if (idempotencyKey.Length > 200)
-            throw new ArgumentException("Idempotency key cannot exceed 200 characters.", nameof(idempotencyKey));
+        if (idempotencyKey.Length > 100)
+            throw new ArgumentException("Idempotency key cannot exceed 100 characters.", nameof(idempotencyKey));
 
         return new ProcessedMessage
         {
             IdempotencyKey = idempotencyKey,
             EventType = eventType,
-            ProcessedAt = processedAt
+            ProcessedAt = processedAt,
         };
     }
 }

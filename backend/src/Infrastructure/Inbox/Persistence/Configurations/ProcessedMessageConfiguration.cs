@@ -8,10 +8,10 @@ public sealed class ProcessedMessageConfiguration : IEntityTypeConfiguration<Pro
 {
     public void Configure(EntityTypeBuilder<ProcessedMessage> builder)
     {
-        builder.ToTable("InboxMessages");
+        builder.ToTable("processed_messages");
         builder.HasKey(m => m.Id);
         builder.Property(m => m.Id).ValueGeneratedOnAdd();
-        builder.Property(m => m.IdempotencyKey).HasMaxLength(200).IsRequired();
+        builder.Property(m => m.IdempotencyKey).HasMaxLength(100).IsRequired();
         builder.Property(m => m.EventType).HasMaxLength(500).IsRequired();
         builder.Property(m => m.ProcessedAt).IsRequired();
         builder.HasIndex(m => m.IdempotencyKey).IsUnique();

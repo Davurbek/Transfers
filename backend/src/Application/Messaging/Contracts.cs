@@ -1,4 +1,7 @@
+using System.Collections.Generic;
+using System.Text.Json;
 using System.Text.Json.Serialization;
+using Universal.Transfers.Domain.PaymentPartners.Enums;
 using Universal.Transfers.Domain.Transactions.Enums;
 
 namespace Universal.Transfers.Application.Messaging;
@@ -17,18 +20,23 @@ public record UnpauseTransactionCommand(string InternalRef, string IssuedByUser)
 [JsonDerivedType(typeof(TransactionRegistrationRetryRequestedEvent), typeDiscriminator: "TransactionRegistrationRetryRequestedEvent")]
 [JsonDerivedType(typeof(TransactionPausedEvent), typeDiscriminator: "TransactionPausedEvent")]
 [JsonDerivedType(typeof(TransactionUnpausedEvent), typeDiscriminator: "TransactionUnpausedEvent")]
+[JsonDerivedType(typeof(TransactionUnpauseRequestedEvent), typeDiscriminator: "TransactionUnpauseRequestedEvent")]
 public abstract record TransferEvent;
 
 public sealed record TransactionInitiatedEvent(
     string InternalRef,
     string? PartnerRef,
-    string TransactionType,
+    TransactionType TransactionType,
     string RemitterPartnerCode,
-    string PaymentPartner,
+    PaymentPartner PaymentPartner,
     decimal CreditAmount,
     string CreditAmountCurrency,
     string ReceiverCardLast4,
-    DateTime OccurredOn) : TransferEvent;
+    DateTime OccurredOn) : TransferEvent
+{
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtensionData { get; init; }
+}
 
 public sealed record TransactionCreditCompletedEvent(
     string InternalRef,
@@ -72,7 +80,7 @@ public sealed record TransactionRegistrationRetryRequestedEvent(
 
 public sealed record TransactionPausedEvent(
     string InternalRef,
-    string Reason,
+    TransactionPauseReason Reason,
     string? Details,
     TransactionStatus StatusBeforePause,
     DateTime OccurredOn) : TransferEvent;
@@ -82,3 +90,8 @@ public sealed record TransactionUnpausedEvent(
     TransactionStatus ResumedToStatus,
     DateTime OccurredOn,
     string? PausedTelegramMessageId = null) : TransferEvent;
+
+public sealed record TransactionUnpauseRequestedEvent(
+    string InternalRef,
+    DateTime OccurredOn
+) : TransferEvent;

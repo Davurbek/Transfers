@@ -7,6 +7,7 @@ using System.Text.Json;
 using Universal.Transfers.Application.Messaging;
 using Universal.Transfers.Domain.Inbox.Entities;
 using Universal.Transfers.Domain.Inbox.Interfaces;
+using Universal.Transfers.Infrastructure.DeadLetter.Services;
 
 namespace Universal.Transfers.Infrastructure.Messaging.Kafka;
 
@@ -33,9 +34,10 @@ public sealed class KafkaEventConsumer : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        var topics = _options.Topics.Values.Distinct().ToList();
         _logger.LogInformation(
-            "KafkaEventConsumer starting | BootstrapServers={Bootstrap} | GroupId={Group} | ClientId={Client} | EventsTopic={Topic} | DlqTopic={Dlq}",
-            _options.BootstrapServers, _options.GroupId, _options.ClientId, _options.EventsTopic, _options.DlqTopic);
+            "KafkaEventConsumer starting | BootstrapServers={Bootstrap} | GroupId={Group} | ClientId={Client} | Topics={Topics} | DlqTopic={Dlq}",
+            _options.BootstrapServers, _options.GroupId, _options.ClientId, string.Join(", ", topics), _options.DlqTopic);
 
         var config = new ConsumerConfig
         {
@@ -47,9 +49,9 @@ public sealed class KafkaEventConsumer : BackgroundService
         };
 
         using var consumer = new ConsumerBuilder<string, string>(config).Build();
-        consumer.Subscribe(_options.EventsTopic);
+        consumer.Subscribe(topics);
 
-        _logger.LogInformation("Kafka consumer started, subscribed to topic '{Topic}' and waiting for messages", _options.EventsTopic);
+        _logger.LogInformation("Kafka consumer started, subscribed to {Count} topics and waiting for messages", topics.Count);
 
         try
         {
@@ -116,7 +118,7 @@ public sealed class KafkaEventConsumer : BackgroundService
             {
                 _logger.LogError(ex,
                     "Event processing failed at offset {Offset} after {MaxRetries} attempts, routing to DLQ topic '{DlqTopic}'",
-                    result.Offset, MaxRetries, _options.DlqTopic);
+                    result.Offset, MaxRetries, $"{result.Topic}_error");
                 await SendToDlqAsync(result, ct);
                 return;
             }
@@ -127,36 +129,42 @@ public sealed class KafkaEventConsumer : BackgroundService
     {
         _logger.LogDebug("Deserializing event at offset {Offset}: {Value}", result.Offset, result.Message.Value);
 
-        var @event = JsonSerializer.Deserialize<TransferEvent>(result.Message.Value, JsonOpts);
-        if (@event is null)
+        var transferEvent = DeserializeTransferEvent(result.Topic, result.Message.Value);
+        if (transferEvent is null)
         {
-            _logger.LogWarning("Null event deserialized from topic '{Topic}' offset {Offset} - raw: {Raw}",
-                result.Topic, result.Offset, result.Message.Value);
+            _logger.LogWarning("Null/unknown event deserialized from topic '{Topic}' offset {Offset} - raw: {Raw}",
+                result.Topic, result.Offset, result.Message.Value.Length > 500 ? result.Message.Value[..500] : result.Message.Value);
             return;
         }
 
-        var occurredOn = GetOccurredOn(@event);
-        var internalRef = GetInternalRef(@event);
+        var idempotencyKey = result.Message.Headers?
+            .FirstOrDefault(h => h.Key == "idempotency-key")?
+            .GetValueBytes();
 
-        _logger.LogInformation("Storing event in inbox | Type={Type} | InternalRef={Ref} | OccurredOn={OccurredOn} | Offset={Offset}",
-            @event.GetType().Name, internalRef, occurredOn, result.Offset);
+        var key = idempotencyKey is not null
+            ? System.Text.Encoding.UTF8.GetString(idempotencyKey)
+            : result.Message.Key ?? $"{result.Topic}-{result.Offset}";
 
         using var scope = _scopeFactory.CreateScope();
-        var inboxRepo = scope.ServiceProvider.GetRequiredService<IInboxEventRepository>();
+        var processedRepo = scope.ServiceProvider.GetRequiredService<IProcessedMessageRepository>();
 
-        var inboxEvent = new InboxEvent
+        var seen = await processedRepo.GetByIdempotencyKeyAsync(key, ct);
+        if (seen is not null)
         {
-            InternalRef = internalRef,
-            EventType = @event.GetType().Name,
-            Payload = result.Message.Value,
-            OccurredOn = occurredOn,
-            ReceivedAt = DateTime.UtcNow,
-        };
+            _logger.LogWarning("Skipping duplicate message. IdempotencyKey={Key} | ProcessedAt={ProcessedAt}", key, seen.ProcessedAt);
+            return;
+        }
 
-        await inboxRepo.AddAsync(inboxEvent, ct);
-        await inboxRepo.SaveChangesAsync(ct);
+        _logger.LogInformation("Projecting event | Type={Type} | Offset={Offset} | IdempotencyKey={Key}",
+            transferEvent.GetType().Name, result.Offset, key);
 
-        _logger.LogInformation("Event {Type} stored in inbox at offset {Offset}", @event.GetType().Name, result.Offset);
+        var projector = scope.ServiceProvider.GetRequiredService<IEventProjector>();
+        await projector.ProjectAsync(transferEvent, ct);
+
+        processedRepo.Add(ProcessedMessage.Create(key, transferEvent.GetType().FullName!, DateTime.UtcNow));
+        await processedRepo.SaveChangesAsync(ct);
+
+        _logger.LogInformation("Event {Type} projected and dedup recorded at offset {Offset}", transferEvent.GetType().Name, result.Offset);
     }
 
     private static string GetInternalRef(TransferEvent @event) => @event switch
@@ -189,39 +197,51 @@ public sealed class KafkaEventConsumer : BackgroundService
         _ => DateTime.MinValue,
     };
 
+    private TransferEvent? DeserializeTransferEvent(string topic, string payload)
+    {
+        var reverseMap = TopicToEventType;
+        if (!reverseMap.TryGetValue(topic, out var eventTypeName))
+        {
+            _logger.LogWarning("No event type mapping found for topic '{Topic}'", topic);
+            return null;
+        }
+
+        _logger.LogDebug("Deserializing event of type {EventType} from topic '{Topic}'", eventTypeName, topic);
+
+        return eventTypeName switch
+        {
+            nameof(TransactionInitiatedEvent) =>
+                JsonSerializer.Deserialize<TransactionInitiatedEvent>(payload, JsonOpts),
+            nameof(TransactionCreditCompletedEvent) =>
+                JsonSerializer.Deserialize<TransactionCreditCompletedEvent>(payload, JsonOpts),
+            nameof(TransactionCreditFailedEvent) =>
+                JsonSerializer.Deserialize<TransactionCreditFailedEvent>(payload, JsonOpts),
+            nameof(TransactionCreditFailedRetryEvent) =>
+                JsonSerializer.Deserialize<TransactionCreditFailedRetryEvent>(payload, JsonOpts),
+            nameof(TransactionCreditRetryRequestedEvent) =>
+                JsonSerializer.Deserialize<TransactionCreditRetryRequestedEvent>(payload, JsonOpts),
+            nameof(TransactionRegistrationCompletedEvent) =>
+                JsonSerializer.Deserialize<TransactionRegistrationCompletedEvent>(payload, JsonOpts),
+            nameof(TransactionRegistrationFailedRetryEvent) =>
+                JsonSerializer.Deserialize<TransactionRegistrationFailedRetryEvent>(payload, JsonOpts),
+            nameof(TransactionRegistrationRetryRequestedEvent) =>
+                JsonSerializer.Deserialize<TransactionRegistrationRetryRequestedEvent>(payload, JsonOpts),
+            nameof(TransactionPausedEvent) =>
+                JsonSerializer.Deserialize<TransactionPausedEvent>(payload, JsonOpts),
+            nameof(TransactionUnpausedEvent) =>
+                JsonSerializer.Deserialize<TransactionUnpausedEvent>(payload, JsonOpts),
+            _ => null,
+        };
+    }
+
+    private Dictionary<string, string>? _topicToEventType;
+    private Dictionary<string, string> TopicToEventType =>
+        _topicToEventType ??= _options.Topics.ToDictionary(kvp => kvp.Value, kvp => kvp.Key);
+
     private async Task SendToDlqAsync(ConsumeResult<string, string> result, CancellationToken ct)
     {
-        _logger.LogWarning("Moving event to DLQ | OriginalTopic={Topic} | Offset={Offset} | Partition={Partition} | DLQ={DlqTopic}",
-            result.Topic, result.Offset, result.Partition, _options.DlqTopic);
-
-        try
-        {
-            using var producer = new ProducerBuilder<string, string>(new ProducerConfig
-            {
-                BootstrapServers = _options.BootstrapServers,
-            }).Build();
-
-            var dlqResult = await producer.ProduceAsync(_options.DlqTopic, new Message<string, string>
-            {
-                Key = result.Message.Key,
-                Value = result.Message.Value,
-                Headers = new Headers
-                {
-                    new Header("original-topic", System.Text.Encoding.UTF8.GetBytes(result.Topic)),
-                    new Header("original-offset", System.Text.Encoding.UTF8.GetBytes(result.Offset.ToString())),
-                    new Header("original-partition", System.Text.Encoding.UTF8.GetBytes(result.Partition.ToString())),
-                    new Header("dlq-timestamp", System.Text.Encoding.UTF8.GetBytes(DateTime.UtcNow.ToString("O"))),
-                },
-            }, ct);
-
-            _logger.LogWarning(
-                "Event moved to DLQ | DLQTopic={DlqTopic} | DLQPartition={Partition} | DLQOffset={Offset} | OriginalOffset={OriginalOffset}",
-                _options.DlqTopic, dlqResult.Partition, dlqResult.Offset, result.Offset);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "CRITICAL: Failed to send event to DLQ topic '{DlqTopic}' - event at original offset {Offset} may be lost",
-                _options.DlqTopic, result.Offset);
-        }
+        using var scope = _scopeFactory.CreateScope();
+        var dlqService = scope.ServiceProvider.GetRequiredService<DeadLetterService>();
+        await dlqService.SendToDlqAsync(result, $"Max retries exceeded", ct);
     }
 }

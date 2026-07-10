@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
 using Universal.Transfers.Application.Messaging;
+using Universal.Transfers.Domain.Outbox.Interfaces;
 using Universal.Transfers.Domain.Transactions.Enums;
 using Universal.Transfers.Domain.Transactions.Interfaces;
 
@@ -15,7 +16,6 @@ public sealed class KafkaCommandConsumer : BackgroundService
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly KafkaOptions _options;
     private readonly ILogger<KafkaCommandConsumer> _logger;
-    private readonly IProducer<string, string> _producer;
     private static readonly JsonSerializerOptions JsonOpts = new()
     {
         WriteIndented = false,
@@ -39,13 +39,6 @@ public sealed class KafkaCommandConsumer : BackgroundService
         _logger.LogInformation(
             "KafkaCommandConsumer initializing | BootstrapServers={Bootstrap} | GroupId={Group} | CommandsTopic={Topic} | EventsTopic={EventsTopic}",
             _options.BootstrapServers, $"{_options.GroupId}-commands", _options.CommandsTopic, _options.EventsTopic);
-
-        var producerConfig = new ProducerConfig
-        {
-            BootstrapServers = _options.BootstrapServers,
-            ClientId = $"{_options.ClientId}-command-processor",
-        };
-        _producer = new ProducerBuilder<string, string>(producerConfig).Build();
 
         _logger.LogInformation("KafkaCommandConsumer initialized successfully");
     }
@@ -181,7 +174,7 @@ public sealed class KafkaCommandConsumer : BackgroundService
         }
 
         _logger.LogInformation("Step 1/3: Publishing TransactionUnpausedEvent: Paused -> {ResumeTo} for {TxId}", resumeTo, txRef);
-        await PublishEventAsync(new TransactionUnpausedEvent(txRef, resumeTo, DateTime.UtcNow), ct);
+        await WriteToOutboxAsync(new TransactionUnpausedEvent(txRef, resumeTo, DateTime.UtcNow), ct);
 
         _logger.LogInformation("Waiting 500ms before step 2/3 for {TxId}...", txRef);
         await Task.Delay(500, ct);
@@ -194,19 +187,19 @@ public sealed class KafkaCommandConsumer : BackgroundService
 
         if (finalStatus == TransactionStatus.CreditSucceeded)
         {
-            await PublishEventAsync(new TransactionCreditCompletedEvent(txRef, 1, DateTime.UtcNow), ct);
+            await WriteToOutboxAsync(new TransactionCreditCompletedEvent(txRef, 1, DateTime.UtcNow), ct);
         }
         else
         {
-            await PublishEventAsync(new TransactionRegistrationCompletedEvent(txRef, command.IssuedByUser, 1, DateTime.UtcNow), ct);
+            await WriteToOutboxAsync(new TransactionRegistrationCompletedEvent(txRef, command.IssuedByUser, 1, DateTime.UtcNow), ct);
         }
 
         _logger.LogInformation("Step 3/3: Unpause command fully processed for transaction {TxId}", txRef);
     }
 
-    private async Task PublishEventAsync(TransferEvent @event, CancellationToken ct)
+    private async Task WriteToOutboxAsync(TransferEvent @event, CancellationToken ct)
     {
-        var key = @event switch
+        var aggregateId = @event switch
         {
             TransactionUnpausedEvent e => e.InternalRef,
             TransactionCreditCompletedEvent e => e.InternalRef,
@@ -216,37 +209,22 @@ public sealed class KafkaCommandConsumer : BackgroundService
 
         var value = JsonSerializer.Serialize<TransferEvent>(@event, JsonOpts);
 
-        _logger.LogInformation(
-            "Publishing event to Kafka topic '{Topic}' | Key={Key} | EventType={Type} | Payload={Payload}",
-            _options.EventsTopic, key, @event.GetType().Name, value);
+        using var scope = _scopeFactory.CreateScope();
+        var outboxRepo = scope.ServiceProvider.GetRequiredService<IOutboxMessageRepository>();
 
-        var result = await _producer.ProduceAsync(
-            _options.EventsTopic,
-            new Message<string, string>
-            {
-                Key = key,
-                Value = value,
-                Headers = new Headers
-                {
-                    new Header("event-type", System.Text.Encoding.UTF8.GetBytes(@event.GetType().Name)),
-                    new Header("content-type", System.Text.Encoding.UTF8.GetBytes("application/json")),
-                    new Header("source", System.Text.Encoding.UTF8.GetBytes("KafkaCommandConsumer")),
-                    new Header("timestamp", System.Text.Encoding.UTF8.GetBytes(DateTime.UtcNow.ToString("O"))),
-                },
-            },
-            ct);
+        var outboxMessage = new Domain.Outbox.Entities.OutboxMessage
+        {
+            EventType = @event.GetType().FullName!,
+            AggregateId = aggregateId,
+            Payload = value,
+            CreatedAt = DateTime.UtcNow,
+        };
+
+        await outboxRepo.AddAsync(outboxMessage, ct);
+        await outboxRepo.SaveChangesAsync(ct);
 
         _logger.LogInformation(
-            "Event published to Kafka | Topic={Topic} | Partition={Partition} | Offset={Offset} | Key={Key} | EventType={Type}",
-            _options.EventsTopic, result.Partition, result.Offset, key, @event.GetType().Name);
-    }
-
-    public override void Dispose()
-    {
-        _logger.LogInformation("KafkaCommandConsumer disposing, flushing producer...");
-        _producer.Flush(TimeSpan.FromSeconds(5));
-        _producer.Dispose();
-        base.Dispose();
-        _logger.LogInformation("KafkaCommandConsumer disposed");
+            "Event written to outbox | Id={OutboxId} | Type={Type} | AggregateId={AggregateId}",
+            outboxMessage.Id, @event.GetType().Name, aggregateId);
     }
 }
