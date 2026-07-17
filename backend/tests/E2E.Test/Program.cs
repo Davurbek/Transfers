@@ -56,52 +56,42 @@ try
     tx = await repo.GetDetailByInternalRefAsync(txRef);
     Check(tx?.CreditAttempts.Count == 3 && tx?.CurrentStatus == TransactionStatus.CreditFailedRetry, "CreditFailedRetryEvent -> 3 attempts total, status=CreditFailedRetry");
 
-    // ── 6. TransactionCreditRetryRequestedEvent ──────
-    log.Info("Step 6: CreditRetryRequestedEvent");
-    await projector.ProjectAsync(new TransactionCreditRetryRequestedEvent(txRef, DateTime.UtcNow), default);
-    Check(true, "CreditRetryRequestedEvent -> accepted");
-
-    // ── 7. TransactionPausedEvent ────────────────────
-    log.Info("Step 7: PausedEvent");
+    // ── 6. TransactionPausedEvent ────────────────────
+    log.Info("Step 6: PausedEvent");
     await projector.ProjectAsync(new TransactionPausedEvent(txRef, "CreditFailure", null, TransactionStatus.CreditFailedRetry, DateTime.UtcNow), default);
     tx = await repo.GetDetailByInternalRefAsync(txRef);
     Check(tx?.IsPaused == true && tx?.CurrentStatus == TransactionStatus.Paused, "PausedEvent -> IsPaused=true, status=Paused");
 
-    // ── 8. TransactionUnpausedEvent ──────────────────
-    log.Info("Step 8: UnpausedEvent (direct)");
+    // ── 7. TransactionUnpausedEvent ──────────────────
+    log.Info("Step 7: UnpausedEvent (direct)");
     await projector.ProjectAsync(new TransactionUnpausedEvent(txRef, TransactionStatus.CreditFailedRetry, DateTime.UtcNow), default);
     tx = await repo.GetDetailByInternalRefAsync(txRef);
     Check(tx?.IsPaused == false && tx?.CurrentStatus == TransactionStatus.CreditFailedRetry, "UnpausedEvent -> IsPaused=false, status=CreditFailedRetry");
 
-    // ── 9. TransactionRegistrationCompletedEvent ─────
-    log.Info("Step 9: RegistrationCompletedEvent");
+    // ── 8. TransactionRegistrationCompletedEvent ─────
+    log.Info("Step 8: RegistrationCompletedEvent");
     await projector.ProjectAsync(new TransactionRegistrationCompletedEvent(txRef, "tinkoff", 1, DateTime.UtcNow), default);
     tx = await repo.GetDetailByInternalRefAsync(txRef);
     Check(tx?.PartnerRegistrations.Count == 1 && tx?.CurrentStatus == TransactionStatus.RegistrationSucceeded, "RegistrationCompletedEvent -> reg=1, status=RegistrationSucceeded");
 
-    // ── 10. TransactionRegistrationFailedRetryEvent ──
-    log.Info("Step 10: RegistrationFailedRetryEvent");
+    // ── 9. TransactionRegistrationFailedRetryEvent ──
+    log.Info("Step 9: RegistrationFailedRetryEvent");
     await projector.ProjectAsync(new TransactionRegistrationFailedRetryEvent(txRef, "profee", 1, DateTime.UtcNow.AddHours(1), "Partner unavailable", DateTime.UtcNow), default);
     tx = await repo.GetDetailByInternalRefAsync(txRef);
     Check(tx?.PartnerRegistrations.Count == 2 && tx?.CurrentStatus == TransactionStatus.RegistrationFailedRetry, "RegistrationFailedRetryEvent -> 2 registrations, status=RegistrationFailedRetry");
-
-    // ── 11. TransactionRegistrationRetryRequestedEvent
-    log.Info("Step 11: RegistrationRetryRequestedEvent");
-    await projector.ProjectAsync(new TransactionRegistrationRetryRequestedEvent(txRef, DateTime.UtcNow), default);
-    Check(true, "RegistrationRetryRequestedEvent -> accepted");
 
     // ══════════════════════════════════════════════════
     // UNPAUSE FLOW TEST
     // ══════════════════════════════════════════════════
     log.Info("");
-    log.Info("Step 12: Setting up paused transaction for Unpause...");
+    log.Info("Step 10: Setting up paused transaction for Unpause...");
     var uxRef = "TX-E2E-UNPAUSE";
     await projector.ProjectAsync(new TransactionInitiatedEvent(uxRef, null, "standard", "moneygram", "humo", 500m, "EUR", "5678", DateTime.UtcNow), default);
     await projector.ProjectAsync(new TransactionPausedEvent(uxRef, "RegistrationFailure", null, TransactionStatus.RegistrationFailedRetry, DateTime.UtcNow), default);
     tx = await repo.GetDetailByInternalRefAsync(uxRef);
     Check(tx?.IsPaused == true, "Paused transaction created");
 
-    log.Info("Step 13: SimulatedBroker Unpause...");
+    log.Info("Step 11: SimulatedBroker Unpause...");
     var sp = new DiStub(repo, projector);
     var cfg = new CfgStub();
     var broker = new SimulatedBroker(sp, NullLogger<SimulatedBroker>.Instance, cfg);

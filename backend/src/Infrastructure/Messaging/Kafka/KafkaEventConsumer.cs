@@ -173,10 +173,8 @@ public sealed class KafkaEventConsumer : BackgroundService
         TransactionCreditCompletedEvent e => e.InternalRef,
         TransactionCreditFailedEvent e => e.InternalRef,
         TransactionCreditFailedRetryEvent e => e.InternalRef,
-        TransactionCreditRetryRequestedEvent e => e.InternalRef,
         TransactionRegistrationCompletedEvent e => e.InternalRef,
         TransactionRegistrationFailedRetryEvent e => e.InternalRef,
-        TransactionRegistrationRetryRequestedEvent e => e.InternalRef,
         TransactionPausedEvent e => e.InternalRef,
         TransactionUnpausedEvent e => e.InternalRef,
         _ => "unknown",
@@ -188,10 +186,8 @@ public sealed class KafkaEventConsumer : BackgroundService
         TransactionCreditCompletedEvent e => e.OccurredOn,
         TransactionCreditFailedEvent e => e.OccurredOn,
         TransactionCreditFailedRetryEvent e => e.OccurredOn,
-        TransactionCreditRetryRequestedEvent e => e.OccurredOn,
         TransactionRegistrationCompletedEvent e => e.OccurredOn,
         TransactionRegistrationFailedRetryEvent e => e.OccurredOn,
-        TransactionRegistrationRetryRequestedEvent e => e.OccurredOn,
         TransactionPausedEvent e => e.OccurredOn,
         TransactionUnpausedEvent e => e.OccurredOn,
         _ => DateTime.MinValue,
@@ -218,14 +214,10 @@ public sealed class KafkaEventConsumer : BackgroundService
                 JsonSerializer.Deserialize<TransactionCreditFailedEvent>(payload, JsonOpts),
             nameof(TransactionCreditFailedRetryEvent) =>
                 JsonSerializer.Deserialize<TransactionCreditFailedRetryEvent>(payload, JsonOpts),
-            nameof(TransactionCreditRetryRequestedEvent) =>
-                JsonSerializer.Deserialize<TransactionCreditRetryRequestedEvent>(payload, JsonOpts),
             nameof(TransactionRegistrationCompletedEvent) =>
                 JsonSerializer.Deserialize<TransactionRegistrationCompletedEvent>(payload, JsonOpts),
             nameof(TransactionRegistrationFailedRetryEvent) =>
                 JsonSerializer.Deserialize<TransactionRegistrationFailedRetryEvent>(payload, JsonOpts),
-            nameof(TransactionRegistrationRetryRequestedEvent) =>
-                JsonSerializer.Deserialize<TransactionRegistrationRetryRequestedEvent>(payload, JsonOpts),
             nameof(TransactionPausedEvent) =>
                 JsonSerializer.Deserialize<TransactionPausedEvent>(payload, JsonOpts),
             nameof(TransactionUnpausedEvent) =>

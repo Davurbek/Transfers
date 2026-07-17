@@ -28,17 +28,11 @@ public class EventProjector(
             case TransactionCreditFailedRetryEvent e:
                 await ProjectCreditFailedRetryAsync(e, ct);
                 break;
-            case TransactionCreditRetryRequestedEvent e:
-                await ProjectCreditRetryRequestedAsync(e, ct);
-                break;
             case TransactionRegistrationCompletedEvent e:
                 await ProjectRegistrationCompletedAsync(e, ct);
                 break;
             case TransactionRegistrationFailedRetryEvent e:
                 await ProjectRegistrationFailedRetryAsync(e, ct);
-                break;
-            case TransactionRegistrationRetryRequestedEvent e:
-                await ProjectRegistrationRetryRequestedAsync(e, ct);
                 break;
             case TransactionPausedEvent e:
                 await ProjectPausedAsync(e, ct);
@@ -268,14 +262,6 @@ public class EventProjector(
         logger.LogInformation("Projected TransactionCreditFailedRetryEvent for {InternalRef}", e.InternalRef);
     }
 
-    private async Task ProjectCreditRetryRequestedAsync(TransactionCreditRetryRequestedEvent e, CancellationToken ct)
-    {
-        var tx = await GetOrCreateTransaction(e.InternalRef, ct);
-        await AppendStatusHistory(tx, TransactionStatus.CreditFailedRetry, TransactionStatus.CreditFailedRetry,
-            "Credit retry requested after unpause", "credit-retry-requested", e.OccurredOn, ct);
-        logger.LogInformation("Projected TransactionCreditRetryRequestedEvent for {InternalRef}", e.InternalRef);
-    }
-
     private async Task ProjectRegistrationCompletedAsync(TransactionRegistrationCompletedEvent e, CancellationToken ct)
     {
         var tx = await GetOrCreateTransaction(e.InternalRef, ct);
@@ -321,14 +307,6 @@ public class EventProjector(
             $"Registration failed with {e.RemitterPartnerCode}: {e.FailureReason}",
             $"registration-failed-retry-{e.RemitterPartnerCode}-{e.Attempt}", e.OccurredOn, ct);
         logger.LogInformation("Projected TransactionRegistrationFailedRetryEvent for {InternalRef}", e.InternalRef);
-    }
-
-    private async Task ProjectRegistrationRetryRequestedAsync(TransactionRegistrationRetryRequestedEvent e, CancellationToken ct)
-    {
-        var tx = await GetOrCreateTransaction(e.InternalRef, ct);
-        await AppendStatusHistory(tx, TransactionStatus.RegistrationFailedRetry, TransactionStatus.RegistrationFailedRetry,
-            "Registration retry requested after unpause", "registration-retry-requested", e.OccurredOn, ct);
-        logger.LogInformation("Projected TransactionRegistrationRetryRequestedEvent for {InternalRef}", e.InternalRef);
     }
 
     private async Task ProjectPausedAsync(TransactionPausedEvent e, CancellationToken ct)

@@ -13,10 +13,8 @@ public record TransactionUnpauseRequestedEvent(string InternalRef, string Issued
 [JsonDerivedType(typeof(TransactionCreditCompletedEvent), typeDiscriminator: "TransactionCreditCompletedEvent")]
 [JsonDerivedType(typeof(TransactionCreditFailedEvent), typeDiscriminator: "TransactionCreditFailedEvent")]
 [JsonDerivedType(typeof(TransactionCreditFailedRetryEvent), typeDiscriminator: "TransactionCreditFailedRetryEvent")]
-[JsonDerivedType(typeof(TransactionCreditRetryRequestedEvent), typeDiscriminator: "TransactionCreditRetryRequestedEvent")]
 [JsonDerivedType(typeof(TransactionRegistrationCompletedEvent), typeDiscriminator: "TransactionRegistrationCompletedEvent")]
 [JsonDerivedType(typeof(TransactionRegistrationFailedRetryEvent), typeDiscriminator: "TransactionRegistrationFailedRetryEvent")]
-[JsonDerivedType(typeof(TransactionRegistrationRetryRequestedEvent), typeDiscriminator: "TransactionRegistrationRetryRequestedEvent")]
 [JsonDerivedType(typeof(TransactionPausedEvent), typeDiscriminator: "TransactionPausedEvent")]
 [JsonDerivedType(typeof(TransactionUnpausedEvent), typeDiscriminator: "TransactionUnpausedEvent")]
 public abstract record TransferEvent;
@@ -54,10 +52,6 @@ public sealed record TransactionCreditFailedRetryEvent(
     string FailureReason,
     DateTime OccurredOn) : TransferEvent;
 
-public sealed record TransactionCreditRetryRequestedEvent(
-    string InternalRef,
-    DateTime OccurredOn) : TransferEvent;
-
 public sealed record TransactionRegistrationCompletedEvent(
     string InternalRef,
     string RemitterPartnerCode,
@@ -70,10 +64,6 @@ public sealed record TransactionRegistrationFailedRetryEvent(
     int Attempt,
     DateTime NextAttemptAt,
     string FailureReason,
-    DateTime OccurredOn) : TransferEvent;
-
-public sealed record TransactionRegistrationRetryRequestedEvent(
-    string InternalRef,
     DateTime OccurredOn) : TransferEvent;
 
 public sealed record TransactionPausedEvent(

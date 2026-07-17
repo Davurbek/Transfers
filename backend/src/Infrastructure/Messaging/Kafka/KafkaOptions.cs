@@ -22,9 +22,7 @@ public class KafkaOptions
         [nameof(TransactionCreditCompletedEvent)] = "transaction.credit_completed",
         [nameof(TransactionCreditFailedEvent)] = "transaction.credit_failed",
         [nameof(TransactionCreditFailedRetryEvent)] = "transaction.credit_failed_retry",
-        [nameof(TransactionCreditRetryRequestedEvent)] = "transaction.credit_retry_requested",
         [nameof(TransactionRegistrationCompletedEvent)] = "transaction.registration_completed",
         [nameof(TransactionRegistrationFailedRetryEvent)] = "transaction.registration_failed_retry",
-        [nameof(TransactionRegistrationRetryRequestedEvent)] = "transaction.registration_retry_requested",
     };
 }

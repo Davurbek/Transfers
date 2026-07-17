@@ -184,7 +184,6 @@ try
         //    await projector.ProjectAsync(new TransactionInitiatedEvent("TX-SEED-004", null, "CREDIT", "PARTNER_C", "PAYME", 300000, "GBP", "3456", t.AddHours(3)), default);
         //    await projector.ProjectAsync(new TransactionCreditCompletedEvent("TX-SEED-004", 1, t.AddHours(3).AddSeconds(1)), default);
         //    await projector.ProjectAsync(new TransactionRegistrationFailedRetryEvent("TX-SEED-004", "PARTNER_C", 1, t.AddHours(3).AddSeconds(10), "INVALID_PARTNER", t.AddHours(3).AddSeconds(2)), default);
-        //    await projector.ProjectAsync(new TransactionRegistrationRetryRequestedEvent("TX-SEED-004", t.AddHours(3).AddSeconds(3)), default);
         //    logger.LogInformation("Sample transactions seeded successfully (idempotent - skipped if already exist)");
         //}
     }
